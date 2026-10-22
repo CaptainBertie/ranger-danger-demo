@@ -1,0 +1,2211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Ranger Danger demo</title>
+<meta name="description" content="Interactive demo of the Ranger Danger check-in system: the ranger's phone beside the base dashboard.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+/* Ranger Danger interactive demo. Drawn with the Modsim design system (data register, light only).
+   Every colour is a token declared once on :root; the map layer colours live in MAP_COLOURS in the script. */
+:root {
+  color-scheme: light;
+  /* Modsim base ramps */
+  --ms-paper-050: #f9f9f7; --ms-paper-100: #fcfcfb; --ms-paper-000: #ffffff;
+  --ms-ink-900: #0b0b0b; --ms-ink-600: #52514e; --ms-ink-400: #898781;
+  --ms-rule-100: #f0efec; --ms-rule-200: #e1e0d9; --ms-rule-300: #c3c2b7;
+  --ms-hairline: rgba(11, 11, 11, .10); --ms-wash: rgba(0, 0, 0, .035);
+  --ms-blue-050: #eef4fc; --ms-blue-200: #cde2fb; --ms-blue-600: #2a78d6; --ms-blue-700: #1c5cab;
+  --ms-orange-050: #fdf0ea; --ms-orange-600: #eb6834; --ms-orange-700: #c24d20; --ms-orange-800: #a63f17;
+  --ms-aqua-050: #eaf7f1; --ms-aqua-600: #1baf7a; --ms-aqua-700: #10805a;
+  --ms-amber-050: #fdf6e7; --ms-amber-300: rgba(237, 161, 0, .3); --ms-amber-700: #9a6b00;
+
+  /* surfaces */
+  --surface-page: var(--ms-paper-050);
+  --surface-card: var(--ms-paper-100);
+  --surface-tile: var(--ms-paper-000);
+  --surface-wash: var(--ms-wash);
+  --surface-inverse: var(--ms-ink-900);
+  /* text */
+  --text-1: var(--ms-ink-900);
+  --text-2: var(--ms-ink-600);
+  --text-muted: var(--ms-ink-400);
+  --text-inverse: var(--ms-paper-100);
+  /* lines */
+  --border-hairline: var(--ms-hairline);
+  --border-rule: var(--ms-rule-200);
+  --border-strong: var(--ms-rule-300);
+  --border-divider: var(--ms-rule-100);
+  /* meaning */
+  --accent: var(--ms-blue-600);
+  --accent-hover: var(--ms-blue-700);
+  --accent-soft: var(--ms-blue-200);
+  --accent-wash: var(--ms-blue-050);
+  --accent-edge: rgba(42, 120, 214, .35);
+  --define: var(--ms-aqua-600);
+  --define-ink: var(--ms-aqua-700);
+  --define-wash: var(--ms-aqua-050);
+  --define-edge: rgba(27, 175, 122, .30);
+  --caution: var(--ms-amber-700);
+  --caution-wash: var(--ms-amber-050);
+  --caution-edge: var(--ms-amber-300);
+  --practice: var(--ms-orange-600);
+  --practice-ink: var(--ms-orange-700);
+  --practice-press: var(--ms-orange-800);
+  --practice-wash: var(--ms-orange-050);
+  --practice-edge: rgba(235, 104, 52, .5);
+  /* the ghost pill on the dark fall screen: paper at 30% for the edge, 10% for hover */
+  --inverse-edge: color-mix(in srgb, var(--text-inverse) 30%, transparent);
+  --inverse-hover: color-mix(in srgb, var(--text-inverse) 10%, transparent);
+  --inverse-track: color-mix(in srgb, var(--text-inverse) 35%, transparent);
+  /* the phone's bezel: a warm near-black a step lighter than the black fall screen, as in the slides */
+  --phone-bezel: color-mix(in srgb, var(--ms-ink-900) 78%, var(--ms-ink-600));
+
+  /* type */
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --weight-regular: 400; --weight-semi: 600; --weight-mid: 650; --weight-bold: 700;
+  --text-label: .72rem; --text-label-track: .14em;
+  --text-tag: .7rem; --text-tag-track: .12em;
+  --text-ui-xxs: .68rem;
+  --text-data-body: 13.5px; --text-data-meta: 13px; --text-data-note: 12px; --text-data-table: 12.5px;
+  --text-chart-tick: 10.5px; --text-chart-label: 11px;
+  --tracking-display: -.03em;
+
+  /* shape and motion */
+  --radius-sm: 6px; --radius-panel: 8px; --radius-card: 12px; --radius-pill: 999px;
+  /* Modsim's emphasis border is 1.5px, but Chromium draws a 1.5px border as 1px, so the one open red alert
+     would look like every other banner. 2px is the nearest width that survives the rounding. */
+  --border-width-hairline: 1px; --border-width-emphasis: 2px; --border-width-rail: 4px;
+  --shadow-float: 0 2px 10px rgba(0, 0, 0, .08);
+  --focus-ring: 0 0 0 3px var(--accent-wash);
+  --dur-fast: 150ms;
+  --ease-standard: cubic-bezier(.2, .6, .2, 1);
+
+  /* demo measurements */
+  --s: 1;              /* phone scale, set by the script */
+  --hold-ms: 2000ms;   /* set by the script from HOLD_MS */
+  --snap-ms: 150ms;    /* set by the script from SNAP_BACK_MS */
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { margin: 0; }
+body {
+  background: var(--surface-page);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-data-body);
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+button { font: inherit; color: inherit; margin: 0; }
+p { margin: 0; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.micro {
+  font-size: var(--text-tag);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--text-tag-track);
+  text-transform: uppercase;
+  line-height: 1.3;
+  color: var(--text-muted);
+}
+.mono { font-family: var(--font-mono); font-size: .92em; }
+.dot {
+  flex: none; display: inline-block; width: 6px; height: 6px;
+  border-radius: var(--radius-pill); background: var(--border-strong);
+}
+
+/* ------------------------------------------------------------ buttons (pills) */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 14px;
+  font-weight: var(--weight-semi); line-height: 1.2; white-space: nowrap;
+  border-radius: var(--radius-pill);
+  border: var(--border-width-hairline) solid var(--btn-edge);
+  background: var(--btn-bg); color: var(--btn-fg);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.btn-primary.btn-accent { --btn-bg: var(--accent); --btn-edge: var(--accent); --btn-fg: var(--text-inverse); --btn-hover: var(--accent-hover); }
+.btn-primary.btn-practice { --btn-bg: var(--practice-ink); --btn-edge: var(--practice-ink); --btn-fg: var(--text-inverse); --btn-hover: var(--practice-press); }
+.btn-ghost.btn-accent { --btn-bg: var(--surface-tile); --btn-edge: var(--accent-edge); --btn-fg: var(--accent); --btn-hover: var(--accent-wash); }
+.btn-dark { --btn-bg: transparent; --btn-edge: var(--inverse-edge); --btn-fg: var(--text-inverse); --btn-hover: var(--inverse-hover); }
+/* Hover only where a pointer can hover: on a touch screen :hover sticks after a tap. */
+@media (hover: hover) {
+  .btn:hover:not(:disabled) { background: var(--btn-hover); }
+  .btn-primary:hover:not(:disabled) { border-color: var(--btn-hover); }
+}
+.btn:active:not(:disabled) { background: var(--btn-hover); }
+.btn-primary:active:not(:disabled) { border-color: var(--btn-hover); }
+.btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn-sm { height: 26px; padding: 0 11px; font-size: var(--text-data-note); }
+
+/* ------------------------------------------------------------ page grid */
+.page {
+  max-width: 1440px; margin: 0 auto;
+  height: 100vh; height: 100dvh;
+  padding: 4px 12px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: 28px minmax(0, 1fr) auto auto;
+  grid-template-areas: "strip strip" "phone dash" "cap cap" "diag diag";
+  column-gap: 12px; row-gap: 4px;
+}
+
+/* top strip */
+.strip { grid-area: strip; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.strip-left { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 14px; }
+.strip-title { white-space: nowrap; color: var(--text-2); }
+.timings { color: var(--text-2); font-size: var(--text-data-note); line-height: 1.35; }
+.strip .timings { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip-right { flex: none; display: flex; align-items: center; gap: 6px; }
+/* The timings label sits in the strip when the strip is wide enough, otherwise in the diagram panel. */
+.timings-diag { display: none; }
+@media (min-width: 720px) and (max-width: 1099.98px) {
+  .strip .timings { display: none; }
+  .timings-diag { display: block; }
+}
+
+/* caption */
+.caption {
+  grid-area: cap; height: 22px; line-height: 22px; margin: 0;
+  text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: var(--text-data-body); color: var(--text-1);
+}
+
+/* ------------------------------------------------------------ phone */
+.phone-col { grid-area: phone; position: relative; min-height: 0; }
+.phone-probe { position: absolute; top: 0; bottom: 0; left: 0; width: 0; visibility: hidden; pointer-events: none; }
+.phone-slot { width: calc(360px * var(--s)); height: calc(740px * var(--s)); }
+.phone {
+  width: 360px; height: 740px; padding: 10px;
+  border-radius: 44px; background: var(--phone-bezel);
+  transform: scale(var(--s)); transform-origin: 0 0;
+}
+.screen {
+  position: relative; width: 340px; height: 720px; overflow: hidden;
+  border-radius: 34px; background: var(--surface-page); color: var(--text-1);
+  display: flex; flex-direction: column;
+  font-size: 18px; line-height: 1.35;
+}
+.screen.dark { background: var(--surface-inverse); color: var(--text-inverse); }
+.sbar {
+  flex: none; height: 28px; padding: 6px 26px 0;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 14px; font-weight: var(--weight-semi); line-height: 1;
+}
+.scr { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 16px 16px; }
+.logo-row { flex: none; height: 40px; display: flex; align-items: center; border-bottom: 1px solid var(--border-hairline); }
+.logo-row img { display: block; height: 14px; width: auto; }
+.who { margin: 16px 0 12px; font-size: 20px; font-weight: var(--weight-semi); line-height: 1.2; }
+.due {
+  background: var(--surface-tile); border: 1px solid var(--border-hairline); border-radius: var(--radius-panel);
+  padding: 14px 16px 12px;
+}
+/* 14px, not the .74rem micro size: the phone is scaled to about 0.69 at the 960x640 embed, and this keeps it above 9.5px */
+.due .micro { font-size: 14px; font-weight: var(--weight-semi); letter-spacing: .12em; color: var(--text-muted); }
+.due-value { margin-top: 2px; font-size: 44px; font-weight: var(--weight-mid); line-height: 1.1; letter-spacing: -.01em; }
+.due.overdue .micro, .due.overdue .due-value { color: var(--practice-ink); }
+.due-note { margin-top: 6px; font-size: 17px; color: var(--text-2); line-height: 1.35; }
+/* Check in and Start shift: as tall as in the slides (phones.png), about 104 of the phone's 740 px */
+.btn-xl { display: flex; width: 100%; height: 104px; font-size: 18px; flex: none; }
+.btn-lg { display: flex; width: 100%; height: 64px; font-size: 18px; flex: none; }
+.gap-l { margin-top: 14px; }
+.gap-m { margin-top: 12px; }
+.row2 { display: flex; gap: 10px; margin-top: 12px; }
+.row2 .btn { flex: 1; width: auto; }
+.status {
+  display: flex; align-items: center; gap: 8px; width: fit-content; max-width: 100%;
+  min-height: 24px; margin: 12px 0; font-size: 15px; line-height: 1.3; color: var(--text-muted);
+}
+.status .dot { background: currentColor; }
+.status.tone-good { color: var(--define-ink); }
+.status.tone-alert { color: var(--practice-ink); background: var(--practice-wash); padding: 3px 10px; border-radius: var(--radius-sm); font-weight: var(--weight-semi); }
+.status.empty-line .dot { visibility: hidden; }
+
+/* SOS screen */
+.sos-card {
+  margin-top: 16px; padding: 12px 16px 10px;
+  background: var(--surface-tile); border: 1px solid var(--border-hairline);
+  border-left: var(--border-width-rail) solid var(--practice); border-radius: var(--radius-panel);
+}
+.sos-title { font-size: 28px; font-weight: var(--weight-semi); line-height: 1.2; color: var(--practice-ink); }
+.sos-card .status { margin: 6px 0 0; }
+.seen {
+  margin-top: 12px; padding: 12px 14px;
+  background: var(--define-wash); border-left: var(--border-width-rail) solid var(--define); border-radius: var(--radius-panel);
+  font-size: 18px; line-height: 1.35; color: var(--define-ink); font-weight: var(--weight-semi);
+}
+
+/* fall screen (stage register on the inverse surface) */
+.scr-fall { padding-top: 14px; }
+.fall-tag { font-size: 18px; font-weight: var(--weight-bold); letter-spacing: .12em; text-transform: uppercase; color: var(--practice); line-height: 1.3; }
+.fall-count { margin: 4px 0 6px; font-size: 128px; font-weight: var(--weight-semi); line-height: 1.05; letter-spacing: var(--tracking-display); }
+.fall-line { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 18px; line-height: 1.3; color: var(--define); }
+.fall-line .dot { background: var(--define); }
+.fall-btns { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+/* the status line on the black fall screen, coloured by tone as on the home screen: muted grey (about 5.6:1 on
+   the ink) for "Sending…", the bright aqua for a good confirmation such as "Received by base" */
+.status.status-dark { color: var(--text-muted); margin: 12px 0 0; }
+.status.status-dark.tone-good { color: var(--define); }
+/* The pill's own parts never take the pointer, so touch capture lands on the button and sliding off it cancels the hold. */
+.btn-hold > * { pointer-events: none; }
+.btn-hold { position: relative; width: 100%; height: 72px; flex-direction: column; gap: 2px; padding: 0 56px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.hold-main { font-size: 18px; font-weight: var(--weight-semi); }
+.hold-sub { font-size: 15px; font-weight: 500; }
+.ring { position: absolute; left: 20px; top: 50%; width: 30px; height: 30px; margin-top: -15px; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 3; }
+.ring-track { stroke: var(--inverse-track); }
+.ring-fill { stroke: var(--text-inverse); stroke-dasharray: 81.7; stroke-dashoffset: 81.7; stroke-linecap: round; transition: none; }
+.btn-hold.holding .ring-fill { stroke-dashoffset: 0; transition: stroke-dashoffset var(--hold-ms) linear; }
+
+/* the slider */
+.slider { position: relative; flex: none; }
+.track {
+  position: relative; height: 64px; border-radius: var(--radius-pill); overflow: hidden;
+  border: 1px solid var(--slider-edge); background: var(--slider-bg);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: default;
+}
+.slider-send { --slider-bg: var(--practice-wash); --slider-edge: var(--practice-edge); --slider-solid: var(--practice-ink); }
+.slider-cancel { --slider-bg: var(--surface-tile); --slider-edge: var(--accent-edge); --slider-solid: var(--accent); }
+.slider:has(.sr-action:focus-visible) .track { box-shadow: var(--focus-ring); }
+.track .fill, .track .handle { position: absolute; left: 3px; top: 3px; bottom: 3px; border-radius: var(--radius-pill); background: var(--slider-solid); }
+.track .fill { width: 96px; }
+.track .handle { width: 96px; cursor: grab; touch-action: none; }
+.track .words {
+  position: absolute; inset: 0; padding-left: 99px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: var(--weight-semi); white-space: nowrap;
+  color: var(--slider-solid); pointer-events: none;
+}
+.track .words-inv { color: var(--text-inverse); clip-path: inset(0 calc(100% - 99px) 0 0); }
+.slider.snapping .handle { transition: transform var(--snap-ms) linear; }
+.slider.snapping .fill { transition: width var(--snap-ms) linear; }
+.slider.snapping .words-inv { transition: clip-path var(--snap-ms) linear; }
+
+/* phone map screen */
+.scr-map { padding: 0; }
+.map-head { flex: none; height: 64px; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--border-hairline); }
+.map-title { flex: 1; min-width: 0; font-size: 18px; font-weight: var(--weight-semi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-head .btn { height: 40px; font-size: 14px; padding: 0 11px; }
+.phone-map-wrap { position: relative; flex: 1; min-height: 0; }
+
+/* ------------------------------------------------------------ dashboard */
+.dash {
+  grid-area: dash; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-panel);
+}
+.dash-head {
+  flex: none; height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  background: var(--surface-page); border-bottom: 1px solid var(--border-hairline);
+}
+.dash-title { display: flex; align-items: center; gap: 10px; }
+.dash-title img { display: block; height: 16px; width: auto; }
+.dash-title .micro { padding-left: 10px; border-left: 1px solid var(--border-rule); line-height: 16px; letter-spacing: var(--text-label-track); color: var(--text-muted); }
+.dash-pills { margin-left: auto; display: flex; gap: 6px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px;
+  border: 1px solid var(--border-hairline); border-radius: var(--radius-pill);
+  font-size: var(--text-data-note); color: var(--text-2); white-space: nowrap; background: var(--surface-tile);
+}
+.pill .dot-good { background: var(--define); }
+.pill .n { font-weight: var(--weight-mid); color: var(--text-muted); }
+.pill.alerts-on { border-color: var(--practice-edge); }
+.pill.alerts-on .n { color: var(--practice-ink); }
+
+/* banners */
+.banners {
+  flex: none; display: flex; flex-direction: column; gap: 5px; padding: 5px 10px;
+  border-bottom: 1px solid var(--border-hairline); background: var(--surface-page);
+}
+.banner {
+  padding: 4px 12px 4px;
+  border: var(--border-width-hairline) solid var(--banner-edge);
+  border-left: var(--border-width-rail) solid var(--banner-rail);
+  border-radius: var(--radius-panel); background: var(--banner-wash);
+}
+.banner-red { --banner-rail: var(--practice); --banner-edge: var(--practice-edge); --banner-wash: var(--practice-wash); --banner-ink: var(--practice-ink); }
+.banner-amber { --banner-rail: var(--caution); --banner-edge: var(--caution-edge); --banner-wash: var(--caution-wash); --banner-ink: var(--caution); }
+/* the thicker border takes 1px from the padding on each side, so the banner keeps its height */
+.banner.urgent { padding-top: 3px; padding-bottom: 3px; border-top-width: var(--border-width-emphasis); border-right-width: var(--border-width-emphasis); border-bottom-width: var(--border-width-emphasis); }
+.b-tag { font-size: var(--text-tag); font-weight: var(--weight-bold); letter-spacing: var(--text-tag-track); text-transform: uppercase; line-height: 14px; color: var(--banner-ink); }
+.b-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; line-height: 17px; }
+.b-name { font-size: var(--text-data-body); font-weight: var(--weight-mid); }
+.b-opened { font-size: var(--text-data-table); color: var(--text-2); }
+.b-facts { font-size: var(--text-data-table); line-height: 17px; color: var(--text-2); }
+.b-facts > span { white-space: nowrap; }
+.b-facts > span + span::before { content: "\00a0·\0020"; white-space: normal; font-family: var(--font-ui); font-weight: var(--weight-regular); color: var(--text-muted); }
+.b-facts .strong { color: var(--text-1); font-weight: var(--weight-semi); }
+.b-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+
+/* body: map and ranger list over the alert log */
+.dash-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 5px; padding: 5px 10px 6px; }
+/* Height, in order of who gives way: the map takes what is left over; when the card runs short the log gives
+   way first (its flex-shrink is far larger), down to its label, header and newest row; only in a frame shorter
+   than the design size does the row then shrink below the ranger list, down to the map's 120 px, and the list
+   scrolls inside its own panel. */
+.dash-row { flex: 1 1 auto; min-height: 120px; display: grid; grid-template-columns: minmax(0, 2fr) minmax(258px, 1fr); grid-template-rows: minmax(0, 1fr); gap: 8px; }
+.panel { background: var(--surface-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-panel); }
+.map-panel { position: relative; min-height: 120px; overflow: hidden; }
+.map-canvas { position: absolute; inset: 0; }
+.map-offline {
+  position: absolute; inset: 8px; display: grid; place-items: center; padding: 12px; text-align: center;
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-panel); background: var(--surface-wash);
+  color: var(--text-2); font-size: var(--text-data-meta);
+}
+.ranger-list { list-style: none; margin: 0; padding: 0; align-self: start; max-height: 100%; background: var(--surface-tile); overflow-x: hidden; overflow-y: auto; }
+.rrow { display: grid; grid-template-columns: 6px minmax(0, 1fr); gap: 0 8px; padding: 3px 10px; border-bottom: 1px solid var(--border-divider); }
+.rrow:last-child { border-bottom: 0; }
+.rrow .dot { margin-top: 5px; }
+.rrow.st-well .dot { background: var(--define); }
+.rrow.st-amber .dot { background: var(--caution); }
+.rrow.st-red .dot { background: var(--practice); }
+.rrow.st-off .dot { background: var(--text-muted); }
+.r-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 7px; line-height: 16px; }
+.r-name { font-size: var(--text-data-meta); font-weight: var(--weight-mid); }
+.tag {
+  padding: 0 6px; border: 1px dashed var(--border-strong); border-radius: var(--radius-pill);
+  font-size: var(--text-ui-xxs); font-weight: var(--weight-semi); letter-spacing: var(--text-tag-track); text-transform: uppercase;
+  color: var(--text-muted); line-height: 14px;
+}
+.r-shift { font-size: var(--text-data-note); color: var(--text-2); }
+.st-off .r-shift { color: var(--text-muted); }
+.r-alert { font-size: var(--text-data-note); font-weight: var(--weight-semi); line-height: 14px; }
+.r-alert.lvl-red { color: var(--practice-ink); }
+.r-alert.lvl-amber { color: var(--caution); }
+.r-fact { font-size: var(--text-data-note); line-height: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r-fact .overdue { color: var(--caution); font-weight: var(--weight-semi); }
+
+/* alert log: when the height runs short, only this panel gives way, down to its label, header and newest row */
+.log-panel { flex: 0 10000 auto; min-height: 68px; display: flex; flex-direction: column; overflow: hidden; }
+.log-label { flex: none; padding: 4px 10px 0; }
+.log-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 10px 4px; }
+.log-table { width: 100%; border-collapse: collapse; font-size: var(--text-data-note); line-height: 15px; }
+.log-table th, .log-table td { padding: 3px 12px 3px 0; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border-rule); }
+.log-table th {
+  position: sticky; top: 0; background: var(--surface-card);
+  font-size: var(--text-ui-xxs); font-weight: var(--weight-semi); letter-spacing: var(--text-tag-track); text-transform: uppercase;
+  color: var(--text-2); white-space: nowrap;
+}
+.log-table td:first-child, .log-table td:nth-child(2) { white-space: nowrap; }
+.log-table tr:last-child td { border-bottom: 0; }
+.log-empty {
+  margin: 4px 0 6px; padding: 10px; text-align: center;
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-panel); background: var(--surface-wash);
+  color: var(--text-2); font-size: var(--text-data-meta);
+}
+
+/* Side by side below 940 px the card is only 500-650 px wide: a tighter banner keeps its five buttons and its
+   facts on one line each, and tighter gaps, so two banners still leave room for the map and the newest log row. */
+@media (min-width: 720px) and (max-width: 939.98px) and (orientation: landscape) {
+  .banners { gap: 4px; padding: 4px 8px; }
+  .banner { padding-left: 8px; padding-right: 8px; }
+  .b-facts { font-size: 11.5px; }
+  .b-actions { gap: 4px; }
+  .b-actions .btn-sm { padding: 0 6px; font-size: 11.5px; }
+  .dash-body { gap: 4px; padding: 4px 8px 5px; }
+  .log-label { padding-left: 8px; }
+  .log-scroll { padding: 0 8px 3px; }
+  .log-table th, .log-table td { padding-right: 8px; }
+}
+
+/* ------------------------------------------------------------ diagram panel */
+.diagram { grid-area: diag; padding: 6px 12px; background: var(--surface-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-panel); }
+.diag-row { display: flex; align-items: center; flex-wrap: wrap; row-gap: 6px; }
+.node {
+  flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 112px; padding: 5px 14px; background: var(--surface-tile);
+  border: 1px solid var(--border-hairline); border-radius: var(--radius-card);
+}
+.node-name { font-size: var(--text-data-body); font-weight: var(--weight-semi); line-height: 18px; }
+.node .micro { font-size: var(--text-ui-xxs); line-height: 14px; }
+.link { flex: 1 1 0; min-width: 150px; display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
+.hop { display: flex; flex-direction: column; }
+.hop-label { font-size: 11px; line-height: 13px; color: var(--text-2); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arrow { position: relative; display: block; height: 2px; margin: 4px 2px; background: var(--border-strong); }
+.arrow::after {
+  content: ""; position: absolute; top: 50%; width: 7px; height: 7px;
+  border: solid var(--border-strong); border-width: 2px 2px 0 0;
+}
+.hop-right .arrow::after { right: 0; transform: translateY(-50%) rotate(45deg); }
+.hop-left .arrow::after { left: 0; transform: translateY(-50%) rotate(-135deg); }
+.hop.lit .arrow { background: var(--accent); }
+.hop.lit .arrow::after { border-color: var(--accent); }
+.hop.lit .hop-label { color: var(--accent); font-weight: var(--weight-semi); }
+.timings-diag { flex: 1 1 200px; max-width: 290px; margin-left: 16px; padding-left: 12px; border-left: 1px solid var(--border-hairline); }
+/* Below 940 px there is no room for the footnote beside the boxes: it takes one line of its own under them,
+   so the boxes and arrows stay on one row. */
+@media (max-width: 939.98px) {
+  .diagram { padding-top: 4px; padding-bottom: 4px; }
+  .diag-row { row-gap: 2px; }
+  .timings-diag { flex-basis: 100%; max-width: none; margin: 0; padding: 0; border-left: 0; text-align: center; line-height: 15px; }
+}
+
+/* ------------------------------------------------------------ Leaflet, drawn as Modsim */
+.leaflet-container { font-family: var(--font-ui); font-size: var(--text-data-note); background: var(--border-divider); }
+/* Leaflet 1.9 blends tiles with plus-lighter to hide seams; at a fractional zoom that left a pale veil on some
+   tiles. Normal blending, and each tile 1px larger so neighbours overlap instead of leaving a hairline. */
+.leaflet-container img.leaflet-tile { mix-blend-mode: normal; width: 257px !important; height: 257px !important; }
+.leaflet-bar, .leaflet-touch .leaflet-bar { border: 1px solid var(--border-hairline); border-radius: var(--radius-panel); background: var(--surface-card); box-shadow: none; overflow: hidden; }
+.leaflet-bar a, .leaflet-touch .leaflet-bar a, .leaflet-bar a:first-child, .leaflet-bar a:last-child,
+.leaflet-touch .leaflet-bar a:first-child, .leaflet-touch .leaflet-bar a:last-child {
+  border-radius: 0; background: var(--surface-card); color: var(--text-1); border-bottom-color: var(--border-hairline);
+  transition: background-color var(--dur-fast) var(--ease-standard);
+}
+@media (hover: hover) { .leaflet-bar a:hover { background: var(--accent-wash); } }
+.leaflet-bar a.leaflet-disabled, .leaflet-bar a.leaflet-disabled:hover { background: var(--surface-card); color: var(--text-muted); }
+/* Focus: the Modsim ring. Around the zoom buttons it sits outside the bar; on the map itself it is drawn
+   inside the edge, on a layer above the tiles, because the map panel clips anything outside. */
+.leaflet-bar a:focus-visible { outline: none; background: var(--accent-wash); }
+.leaflet-bar:has(a:focus-visible) { box-shadow: var(--focus-ring); }
+.leaflet-container:focus-visible { outline: none; }
+.leaflet-container:focus-visible::after {
+  content: ""; position: absolute; inset: 0; z-index: 1000; pointer-events: none;
+  border-radius: inherit; box-shadow: inset 0 0 0 3px var(--accent-wash);
+}
+.leaflet-container .leaflet-control-attribution {
+  padding: 1px 8px; background: var(--surface-card); color: var(--text-2); font-size: var(--text-chart-tick);
+  border-top: 1px solid var(--border-hairline); border-left: 1px solid var(--border-hairline); border-top-left-radius: var(--radius-panel);
+}
+/* The phone map: the credit is lifted clear of the screen's rounded corner and set larger, because the
+   whole phone is scaled down (about 0.69 at 960x640). */
+#phoneMap .leaflet-bottom.leaflet-right { right: 16px; bottom: 10px; }
+#phoneMap .leaflet-control-attribution { margin: 0; padding: 2px 10px; font-size: 13px; border: 1px solid var(--border-hairline); border-radius: var(--radius-panel); }
+#phoneMap .site-label { font-size: 14px; }
+.leaflet-popup-content-wrapper { background: var(--surface-card); color: var(--text-1); border: 1px solid var(--border-hairline); border-radius: var(--radius-panel); box-shadow: var(--shadow-float); }
+.leaflet-popup-tip { background: var(--surface-card); box-shadow: none; }
+.leaflet-popup-content { margin: 8px 14px; display: flex; flex-direction: column; gap: 2px; font-size: var(--text-data-meta); line-height: 1.4; }
+.pop-name { font-weight: var(--weight-mid); }
+.pop-meta { color: var(--text-2); font-size: var(--text-data-note); }
+.site-label .lb { display: none; }
+.site-label.two-line .lb { display: inline; }
+.site-label {
+  width: auto !important; height: auto !important; background: none; border: 0;
+  font-family: var(--font-ui); font-size: 11.5px; font-weight: var(--weight-semi); line-height: 1.15; white-space: nowrap;
+  color: var(--map-label); text-shadow: var(--map-halo); pointer-events: none;
+}
+.rmark {
+  display: grid; place-items: center; border-radius: var(--radius-pill); border: 2px solid var(--surface-tile);
+  color: var(--text-inverse); font-family: var(--font-ui); font-size: 11px; font-weight: var(--weight-bold); line-height: 1;
+}
+.rmark.m-well { background: var(--define); }
+.rmark.m-amber { background: var(--caution); }
+.rmark.m-red { background: var(--practice); }
+.rmark.m-off { background: var(--text-muted); opacity: .45; }
+path.trail { stroke-width: 3; stroke-opacity: .9; fill: none; }
+path.trail.m-well { stroke: var(--define); }
+path.trail.m-amber { stroke: var(--caution); }
+path.trail.m-red { stroke: var(--practice); }
+path.me-dot { fill: var(--accent); fill-opacity: 1; stroke: var(--surface-tile); stroke-width: 2; }
+/* the 25 m accuracy ring: a pale wash with a blue edge, so it reads on dark bush imagery as well as on sand */
+path.me-ring { fill: var(--accent-wash); fill-opacity: .3; stroke: var(--accent); stroke-width: 1.5; stroke-opacity: .9; }
+path.me-trail { stroke: var(--accent); stroke-width: 3; stroke-opacity: .9; fill: none; }
+
+/* ------------------------------------------------------------ narrow: stack and scroll */
+/* Below 720 px wide, and on a portrait screen narrower than 940 px, where the dashboard beside a full-size
+   phone would leave the map a strip. The script reads the same query (STACKED_QUERY). */
+@media (max-width: 719.98px), (max-width: 939.98px) and (orientation: portrait) {
+  .page {
+    height: auto; min-height: 100vh; padding: 8px 16px 16px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto auto;
+    grid-template-areas: "strip" "phone" "cap" "dash" "diag";
+    row-gap: 10px;
+  }
+  .strip { flex-wrap: wrap; row-gap: 6px; }
+  .strip-left { flex: 1 1 100%; flex-wrap: wrap; row-gap: 2px; }
+  .strip .timings { display: inline; white-space: normal; }
+  .timings-diag { display: none; }
+  .phone-col { display: flex; justify-content: center; }
+  .phone-probe { bottom: auto; height: 0; right: 0; width: auto; }
+  .caption { height: auto; line-height: 1.4; white-space: normal; }
+  .dash { overflow: visible; }
+  .dash-body { flex: none; }
+  .dash-row { flex: none; min-height: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
+  .ranger-list { max-height: none; }
+  .map-panel { height: 260px; }
+  .log-panel { flex: none; }
+  /* every column readable on a phone: tighter cells that wrap, instead of pushing REASON past the panel */
+  .log-label { padding-left: 6px; }
+  .log-scroll { padding: 0 6px 4px; }
+  .log-table th, .log-table td { padding-right: 6px; }
+  .log-table th { letter-spacing: .06em; }
+  .log-table td:first-child, .log-table td:nth-child(2) { white-space: normal; }
+  .diag-row { flex-direction: column; align-items: stretch; }
+  .node { min-width: 0; }
+  .link { flex: none; min-width: 0; flex-direction: row; justify-content: center; gap: 18px; padding: 2px 0; }
+  .hop { flex-direction: row; align-items: center; gap: 6px; }
+  .hop-left { flex-direction: row-reverse; }
+  .hop-label { white-space: normal; text-align: left; max-width: 120px; }
+  .arrow { width: 2px; height: 26px; margin: 2px 6px; }
+  .hop-right .arrow::after { right: auto; left: 50%; top: auto; bottom: 0; transform: translateX(-50%) rotate(135deg); }
+  .hop-left .arrow::after { left: 50%; top: 0; transform: translateX(-50%) rotate(-45deg); }
+}
+</style>
+</head>
+<body>
+<div class="page" id="page">
+
+  <header class="strip">
+    <div class="strip-left">
+      <span class="micro strip-title">RANGER DANGER · INTERACTIVE DEMO</span>
+      <span class="timings">Timings are sped up for the demo (real: 60 min check-in, 5 min fall countdown)</span>
+    </div>
+    <div class="strip-right">
+      <button type="button" class="btn btn-sm btn-primary btn-accent" id="btnSound">Click to enable alarm sound</button>
+      <button type="button" class="btn btn-sm btn-ghost btn-accent" id="btnReset">Reset demo</button>
+    </div>
+  </header>
+
+  <section class="phone-col" aria-label="The ranger's phone">
+    <div class="phone-probe" id="phoneProbe"></div>
+    <div class="phone-slot">
+      <div class="phone">
+        <div class="screen" id="screen">
+          <div class="sbar" aria-hidden="true"><span id="sbTime">10:41</span><span>86%</span></div>
+
+          <section class="scr scr-home" id="scrHome">
+            <div class="logo-row"><img src="data:image/png;base64,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" alt="Ranger Danger" width="61" height="14"></div>
+            <div class="who">Jacob Wilson</div>
+
+            <div id="homeOn" hidden>
+              <div class="due" id="dueCard">
+                <div class="micro" id="dueLabel">NEXT CHECK-IN DUE IN</div>
+                <div class="due-value" id="dueValue">0:30</div>
+              </div>
+              <button type="button" class="btn btn-primary btn-accent btn-xl gap-l" id="btnCheckin">Check in</button>
+              <p class="status" id="homeStatus"><span class="dot"></span><span class="t"></span></p>
+              <div class="slider slider-send" id="sliderSend">
+                <div class="track" aria-hidden="true"><span class="fill"></span><span class="handle"></span><span class="words">Slide to send SOS</span><span class="words words-inv">Slide to send SOS</span></div>
+                <button type="button" class="visually-hidden sr-action">Slide to send SOS</button>
+              </div>
+              <div class="slider slider-cancel" id="sliderCancelHome" hidden>
+                <div class="track" aria-hidden="true"><span class="fill"></span><span class="handle"></span><span class="words">Slide to cancel SOS</span><span class="words words-inv">Slide to cancel SOS</span></div>
+                <button type="button" class="visually-hidden sr-action">Slide to cancel SOS</button>
+              </div>
+              <button type="button" class="btn btn-ghost btn-accent btn-lg gap-m" id="btnEndShift">End shift</button>
+              <div class="row2">
+                <button type="button" class="btn btn-ghost btn-accent btn-lg" id="btnMapOn">Map</button>
+                <button type="button" class="btn btn-ghost btn-accent btn-lg" id="btnFall">Simulate fall</button>
+              </div>
+            </div>
+
+            <div id="homeOff">
+              <div class="due">
+                <div class="micro">OFF SHIFT</div>
+                <p class="due-note">Start a shift to begin check-ins.</p>
+              </div>
+              <button type="button" class="btn btn-primary btn-accent btn-xl gap-l" id="btnStartShift">Start shift</button>
+              <button type="button" class="btn btn-ghost btn-accent btn-lg gap-m" id="btnMapOff">Map</button>
+            </div>
+          </section>
+
+          <section class="scr scr-sos" id="scrSos" hidden>
+            <div class="sos-card">
+              <div class="sos-title">SOS</div>
+              <p class="status" id="sosStatus"><span class="dot"></span><span class="t">Sending SOS…</span></p>
+            </div>
+            <div class="seen" id="sosSeen" hidden>Base has seen your alert. Help is coming.</div>
+            <div class="slider slider-cancel gap-l" id="sliderCancelSos">
+              <div class="track" aria-hidden="true"><span class="fill"></span><span class="handle"></span><span class="words">Slide to cancel SOS</span><span class="words words-inv">Slide to cancel SOS</span></div>
+              <button type="button" class="visually-hidden sr-action">Slide to cancel SOS</button>
+            </div>
+            <button type="button" class="btn btn-ghost btn-accent btn-lg gap-m" id="btnBackHome">Back to home</button>
+          </section>
+
+          <section class="scr scr-fall" id="scrFall" hidden>
+            <div class="fall-tag">POSSIBLE FALL</div>
+            <div class="fall-count" id="fallCount">0:15</div>
+            <p class="fall-line" id="fallAlerted" hidden><span class="dot"></span><span>Base has been alerted</span></p>
+            <p class="fall-line" id="fallSeen" hidden>Base has seen your alert. Help is coming.</p>
+            <div class="fall-btns">
+              <button type="button" class="btn btn-primary btn-accent btn-hold" id="holdOk">
+                <svg class="ring" viewBox="0 0 32 32" aria-hidden="true"><circle class="ring-track" cx="16" cy="16" r="13"></circle><circle class="ring-fill" cx="16" cy="16" r="13"></circle></svg>
+                <span class="hold-main">I'm OK</span><span class="hold-sub">Hold for 2 seconds</span>
+              </button>
+              <button type="button" class="btn btn-primary btn-practice btn-hold" id="holdHelp">
+                <svg class="ring" viewBox="0 0 32 32" aria-hidden="true"><circle class="ring-track" cx="16" cy="16" r="13"></circle><circle class="ring-fill" cx="16" cy="16" r="13"></circle></svg>
+                <span class="hold-main">Need help now</span><span class="hold-sub">Hold for 2 seconds</span>
+              </button>
+              <button type="button" class="btn btn-dark btn-lg" id="btnFallCheckin">Check in</button>
+            </div>
+            <p class="status status-dark" id="fallStatus" hidden><span class="dot"></span><span class="t"></span></p>
+          </section>
+
+          <section class="scr scr-map" id="scrMap" hidden>
+            <div class="map-head">
+              <span class="map-title">Lama Lama map</span>
+              <button type="button" class="btn btn-ghost btn-accent" id="btnMapBack">Back</button>
+              <button type="button" class="btn btn-ghost btn-accent" id="btnMyPos">My position</button>
+            </div>
+            <div class="phone-map-wrap"><div class="map-canvas" id="phoneMap"></div></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="dash" aria-label="The base dashboard">
+    <div class="dash-head">
+      <div class="dash-title"><img src="data:image/png;base64,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" alt="Ranger Danger" width="70" height="16"><span class="micro">BASE</span></div>
+      <div class="dash-pills">
+        <span class="pill"><span class="dot dot-good"></span>Live</span>
+        <span class="pill" id="alertsPill">Alerts <span class="n" id="alertsN">0</span></span>
+      </div>
+    </div>
+    <div class="banners" id="banners" hidden></div>
+    <div class="dash-body">
+      <div class="dash-row">
+        <div class="panel map-panel"><div class="map-canvas" id="baseMap"></div></div>
+        <ul class="panel ranger-list" id="rangerList" aria-label="Rangers"></ul>
+      </div>
+      <div class="panel log-panel">
+        <div class="micro log-label">ALERT LOG</div>
+        <div class="log-scroll" id="logScroll">
+          <p class="log-empty" id="logEmpty">No alerts yet</p>
+          <table class="log-table" id="logTable" hidden>
+            <thead><tr><th scope="col">TIME</th><th scope="col">RANGER</th><th scope="col">TYPE</th><th scope="col">STATE</th><th scope="col">REASON</th></tr></thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="caption" id="caption" aria-live="polite">Tap Start shift on the phone to begin.</p>
+
+  <section class="diagram" aria-label="How a message travels: Phone, Server (cloud), Dashboard (ranger base)">
+    <div class="diag-row">
+      <div class="node"><span class="node-name">Phone</span><span class="micro">IN THE FIELD</span></div>
+      <div class="link">
+        <div class="hop hop-right" id="hop-p2s"><span class="hop-label">Location, status, alerts</span><span class="arrow"></span></div>
+        <div class="hop hop-left" id="hop-s2p"><span class="arrow"></span><span class="hop-label">Confirmations</span></div>
+      </div>
+      <div class="node"><span class="node-name">Server</span><span class="micro">CLOUD</span></div>
+      <div class="link">
+        <div class="hop hop-right" id="hop-s2d"><span class="hop-label">Live updates</span><span class="arrow"></span></div>
+        <div class="hop hop-left" id="hop-d2s"><span class="arrow"></span><span class="hop-label">Rescue status</span></div>
+      </div>
+      <div class="node"><span class="node-name">Dashboard</span><span class="micro">RANGER BASE</span></div>
+      <p class="timings timings-diag">Timings are sped up for the demo (real: 60 min check-in, 5 min fall countdown)</p>
+    </div>
+  </section>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+'use strict';
+(function () {
+
+  /* ================================================================ timings */
+  const CHECKIN_INTERVAL_MS = 30000;   // real system: 60 min
+  const REMINDER_BEFORE_MS = 8000;     // chime once per deadline
+  const FALL_COUNTDOWN_MS = 15000;     // real system: 5 min
+  const HOLD_MS = 2000;                // I'm OK, Need help now
+  const HOP_MS = 200;                  // one arrow of the diagram; phone to base = 2 hops
+  const POSITION_EVERY_MS = 6000;      // Jacob's phone sends a position while on shift
+  const SLIDE_COMPLETE = 0.9;          // share of the handle's travel that sends
+  const SNAP_BACK_MS = 150;            // linear, no bounce
+  const TICK_MS = 250;                 // one redraw of every clock
+  const JACOB_ROUTE_MS = 240000;       // ROUTE_A end to end, then back
+  const DECOR_A_LEG_MS = 180000;       // Ranger A, one way
+  const DECOR_B_LEG_MS = 240000;       // Ranger B, one way
+  const DECOR_REPORT_MS = 4000;        // decor rangers send a position
+  const DECOR_CHECKIN_MIN_MS = 18000;  // decor rangers check in at a random time
+  const DECOR_CHECKIN_MAX_MS = 26000;
+  const POPUP_MS = 4000;               // "Show on map" popup
+  const TAP_SLOP_PX = 4;               // a press that moves less than this is a tap
+
+  /* ================================================================ fixed facts */
+  const TRAIL_POINTS = 12;
+  const PEAK_FORCE_G = 3.1;
+  const JACOB = { name: 'Jacob Wilson', letter: 'J', battery: 86 };
+  const HANDLE_W = 96;
+  const HANDLE_INSET = 3;
+  const PHONE_MAP_ZOOM = 16.5;         // the phone map opens here: the 25 m accuracy ring (about 30 px across) shows clear of the 14 px dot
+  const DASH_MIN_W = 500;              // side by side, the phone shrinks before the dashboard gets narrower than this
+  const STACKED_QUERY = '(max-width: 719.98px), (max-width: 939.98px) and (orientation: portrait)';   // same as the CSS
+
+  // [lat, lng], from Prototype/admin/public/map/routes.json
+  const ROUTE_A = [[-14.07975, 143.63766], [-14.08024, 143.64698], [-14.07672, 143.66072], [-14.07609, 143.67674], [-14.07538, 143.67822], [-14.07296, 143.68083], [-14.06979, 143.68265], [-14.06932, 143.68374]];
+  const PATH_RANGER_A = [[-14.08079, 143.6376], [-14.07978, 143.64105], [-14.07756, 143.64019], [-14.07699, 143.64017], [-14.07614, 143.6404], [-14.07456, 143.64038], [-14.07302, 143.64055], [-14.07096, 143.64], [-14.06942, 143.63951], [-14.06882, 143.63951], [-14.06702, 143.63864], [-14.06588, 143.63864], [-14.06407, 143.63864], [-14.06249, 143.63851], [-14.06184, 143.63817], [-14.06056, 143.63745]];
+  const PATH_RANGER_B = [[-14.07975, 143.63766], [-14.07901, 143.62381], [-14.07685, 143.61282], [-14.07694, 143.61046], [-14.07754, 143.60536]];
+  const BASE_POINT = ROUTE_A[0];
+
+  // The five sites, from Prototype/admin/public/map/layers.json. GeoJSON order: [lng, lat].
+  const SITES = {
+    type: 'FeatureCollection',
+    features: [
+      { type: 'Feature', properties: { name: 'Ranger Base, Port Stewart', kind: 'hub' }, geometry: { type: 'Point', coordinates: [143.63760, -14.08079] } },
+      { type: 'Feature', properties: { name: 'Upper Camp, Port Stewart', kind: 'staffed' }, geometry: { type: 'Point', coordinates: [143.66387, -14.08364] } },
+      { type: 'Feature', properties: { name: 'Lower Camp, Port Stewart', kind: 'staffed' }, geometry: { type: 'Point', coordinates: [143.68391, -14.06969] } },
+      { type: 'Feature', properties: { name: 'Safari Camp', kind: 'unstaffed' }, geometry: { type: 'Point', coordinates: [143.68123, -14.07625] } },
+      { type: 'Feature', properties: { name: 'Port Stewart airstrip', kind: 'unstaffed' }, geometry: { type: 'Point', coordinates: [143.63312, -14.07863] } }
+    ]
+  };
+
+  // Cartography, not interface colour: the one place a hex value is written outside :root.
+  const MAP_COLOURS = {
+    hub: '#5b9bff',
+    staffed: '#4bb3a8',
+    unstaffed: '#8c8378',
+    siteOutline: '#0d1013',
+    label: '#ffffff',
+    labelHalo: '0 0 4px #000, 0 0 9px #000, 0 1px 2px #000'
+  };
+  const TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  const ATTRIBUTION = 'Powered by Esri · Esri World Imagery';
+
+  /* ================================================================ words */
+  const CAPTION_START = 'Tap Start shift on the phone to begin.';
+  const HOLD_HINT = 'Hold the button for 2 s. A quick touch cannot cancel a fall.';
+  const STATUS = {
+    sending: { text: 'Sending…', tone: 'muted' },
+    received: { text: 'Received by base', tone: 'good' },
+    shiftStarted: { text: 'Shift started', tone: 'good' },
+    sosCancelled: { text: 'SOS cancelled', tone: 'muted' },
+    imOk: { text: "Fall cancelled · I'm OK sent", tone: 'good' },
+    closedByBase: { text: 'Alert closed by base', tone: 'muted' },
+    helpComing: { text: 'Base has seen your alert. Help is coming.', tone: 'good' },
+    none: { text: '', tone: 'muted' }
+  };
+  const OPEN_REASON = { sos: 'SOS', fall: 'fall detected', missed: 'missed check-in' };
+
+  /* ================================================================ small helpers */
+  const $ = (sel) => document.querySelector(sel);
+  const pad2 = (n) => (n < 10 ? '0' : '') + n;
+  const MINUS = '−';
+
+  // "5:12:37 pm": local 12-hour time with seconds, written by hand.
+  function clock(ms) {
+    const d = new Date(ms);
+    const h = d.getHours();
+    return ((h % 12) || 12) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()) + ' ' + (h >= 12 ? 'pm' : 'am');
+  }
+  function statusBarTime(ms) {
+    const d = new Date(ms);
+    return ((d.getHours() % 12) || 12) + ':' + pad2(d.getMinutes());
+  }
+  function countdown(msLeft) {
+    const s = Math.max(0, Math.ceil(msLeft / 1000));
+    return Math.floor(s / 60) + ':' + pad2(s % 60);
+  }
+  function coord(n) { return (n < 0 ? MINUS : '') + Math.abs(n).toFixed(5); }
+  function coords(p) { return coord(p[0]) + ', ' + coord(p[1]); }
+  function ago(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min';
+  }
+  function delayText(ms) { return (ms / 1000).toFixed(1) + ' s'; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
+  function setHtml(el, html) { if (el.__html !== html) { el.__html = html; el.innerHTML = html; } }
+  function rand(min, max) { return min + Math.random() * (max - min); }
+
+  // Distance along a path, so a ranger moves at an even pace.
+  function pathLengths(path) {
+    const out = [0];
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1], b = path[i];
+      const k = Math.cos(a[0] * Math.PI / 180);
+      out.push(out[i - 1] + Math.hypot((b[1] - a[1]) * k, b[0] - a[0]));
+    }
+    return out;
+  }
+  function pointAlong(path, lengths, f) {
+    const target = Math.min(1, Math.max(0, f)) * lengths[lengths.length - 1];
+    for (let i = 1; i < path.length; i++) {
+      if (target <= lengths[i] || i === path.length - 1) {
+        const span = lengths[i] - lengths[i - 1] || 1;
+        const t = Math.min(1, Math.max(0, (target - lengths[i - 1]) / span));
+        return [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * t, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * t];
+      }
+    }
+    return path[path.length - 1].slice();
+  }
+  function pingPong(x) { const p = ((x % 2) + 2) % 2; return p <= 1 ? p : 2 - p; }
+  const ROUTE_A_LEN = pathLengths(ROUTE_A);
+
+  /* ================================================================ timers that Reset cancels */
+  const pending = new Set();
+  function later(ms, fn) {
+    const id = setTimeout(() => { pending.delete(id); fn(); }, ms);
+    pending.add(id);
+    return id;
+  }
+  function cancel(id) { if (id) { clearTimeout(id); pending.delete(id); } }
+  function cancelAll() { pending.forEach((id) => clearTimeout(id)); pending.clear(); }
+
+  /* ================================================================ state */
+  let phone, srv, dash, walker, decor, nextAlertId, logVersion;
+
+  function initState() {
+    const now = Date.now();
+    // What the phone knows.
+    phone = {
+      screen: 'home',
+      onShift: false,
+      deadline: 0,          // the check-in deadline the phone counts down to
+      remindedFor: 0,       // the deadline the chime already played for
+      overdueFor: 0,        // the deadline whose overdue screen already took over
+      status: STATUS.none,
+      sos: null,            // { ref, acked, search }
+      fall: null,           // { ref, endsAt, noResponseSent, alerted, search, showStatus }
+      nextRef: 1,           // each SOS or fall the phone raises gets its own number, carried to the base alert
+      nextPositionAt: 0,
+      trail: []
+    };
+    // What the server knows: it owns the deadline and spots a missed check-in.
+    srv = { onShift: false, deadline: 0, missedFor: 0 };
+    // What the base dashboard shows.
+    dash = {
+      onShift: false, deadline: 0, lastCheckinAt: 0,
+      lastHeardAt: now, pos: BASE_POINT.slice(), posAt: now, trail: [],
+      alerts: [], log: []
+    };
+    // rest: where Jacob stands while off shift: the ranger base at load, then wherever he ended his shift
+    walker = { progress: 0, last: now, rest: BASE_POINT.slice() };
+    decor = makeDecor(now);
+    nextAlertId = 1;
+    logVersion = (logVersion || 0) + 1;
+  }
+
+  function makeDecor(now) {
+    return [
+      // start: how far along the first leg each one is at load, heading out: clear of the base marker and of
+      // the site names, and the same at every load so the opening map always looks the same
+      { id: 'A', name: 'Ranger A', letter: 'A', path: PATH_RANGER_A, legMs: DECOR_A_LEG_MS, battery: 64, start: 0.75 },
+      { id: 'B', name: 'Ranger B', letter: 'B', path: PATH_RANGER_B, legMs: DECOR_B_LEG_MS, battery: 91, start: 0.6 }
+    ].map((d) => {
+      d.lengths = pathLengths(d.path);
+      d.t0 = now - d.start * d.legMs;
+      d.lastCheckinAt = now - rand(0, 12000);
+      d.deadline = d.lastCheckinAt + CHECKIN_INTERVAL_MS;
+      d.nextCheckinAt = d.lastCheckinAt + rand(DECOR_CHECKIN_MIN_MS, DECOR_CHECKIN_MAX_MS);
+      d.trail = [];
+      for (let k = TRAIL_POINTS - 1; k >= 0; k--) d.trail.push(decorPoint(d, now - k * DECOR_REPORT_MS));
+      d.pos = d.trail[d.trail.length - 1];
+      d.lastHeardAt = now - rand(0, DECOR_REPORT_MS);
+      d.nextReportAt = d.lastHeardAt + DECOR_REPORT_MS;
+      return d;
+    });
+  }
+  function decorPoint(d, t) { return pointAlong(d.path, d.lengths, pingPong((t - d.t0) / d.legMs)); }
+
+  // Jacob walks ROUTE_A while on shift, and stands still while a fall or SOS is active.
+  function stepWalker(now) {
+    const dt = Math.max(0, now - walker.last);
+    walker.last = now;
+    if (phone.onShift && !phone.sos && !phone.fall) walker.progress += dt;
+  }
+  function jacobNow() {
+    if (!phone.onShift) return walker.rest.slice();
+    return pointAlong(ROUTE_A, ROUTE_A_LEN, pingPong(walker.progress / JACOB_ROUTE_MS));
+  }
+
+  /* ================================================================ alerts and the log */
+  const isActive = (a) => a.state === 'open' || a.state === 'search';
+  function activeAlert(type) { return dash.alerts.find((a) => a.type === type && isActive(a)) || null; }
+  // The base alert opened for one SOS or fall of the phone (phoneRef = the number the phone gave it).
+  function activeAlertFor(type, ref) { return dash.alerts.find((a) => a.type === type && a.phoneRef === ref && isActive(a)) || null; }
+  function titleOf(a) {
+    if (a.type === 'sos') return 'SOS';
+    if (a.type === 'missed') return 'Missed check-in';
+    return a.level === 'red' ? 'Fall, no response' : 'Possible fall';
+  }
+  function addLog(a, stateWord, reason) {
+    dash.log.unshift({ at: Date.now(), ranger: JACOB.name, type: titleOf(a), state: stateWord, reason: reason });
+    if (dash.log.length > 8) dash.log.length = 8;
+    logVersion++;
+  }
+  function openAlert(type, level, extra) {
+    const a = Object.assign({ id: nextAlertId++, type: type, level: level, state: 'open', silenced: false, openedAt: Date.now(), reason: '' }, extra || {});
+    dash.alerts.push(a);
+    addLog(a, 'Open', OPEN_REASON[type]);
+    return a;
+  }
+  function endAlert(a, state, reason) {
+    a.state = state;
+    a.reason = reason;
+    addLog(a, state === 'cleared' ? 'Cleared' : 'Closed', reason);
+  }
+
+  /* ================================================================ the diagram and the network */
+  const hops = {};
+  ['p2s', 's2p', 's2d', 'd2s'].forEach((id) => {
+    const el = document.getElementById('hop-' + id);
+    const label = el.querySelector('.hop-label');
+    hops[id] = { el: el, label: label, idle: label.textContent, timer: 0 };
+  });
+  function lightHop(id, name) {
+    const hop = hops[id];
+    hop.el.classList.add('lit');
+    hop.label.textContent = name;
+    cancel(hop.timer);
+    hop.timer = later(HOP_MS, () => {
+      hop.el.classList.remove('lit');
+      hop.label.textContent = hop.idle;
+    });
+  }
+  function idleHops() {
+    Object.values(hops).forEach((hop) => { hop.el.classList.remove('lit'); hop.label.textContent = hop.idle; hop.timer = 0; });
+  }
+
+  // A message from the phone: t=0 phone to server, t=HOP server to dashboard and back to the phone,
+  // t=2 HOP the dashboard applies it and the phone shows the confirmation.
+  function phoneSends(name, handlers) {
+    const t0 = performance.now();
+    const fix = { p: jacobNow(), at: Date.now() };
+    lightHop('p2s', name);
+    later(HOP_MS, () => {
+      if (handlers.atServer) handlers.atServer(Date.now());
+      lightHop('s2d', name);
+      lightHop('s2p', 'received by base');
+      later(HOP_MS, () => {
+        const delay = delayText(performance.now() - t0);
+        if (handlers.atBase) handlers.atBase(delay, Date.now());
+        baseHears(fix);
+        if (handlers.atPhone) handlers.atPhone(delay);
+        render();
+      });
+    });
+    return fix;
+  }
+  function baseHears(fix) {
+    dash.lastHeardAt = Date.now();
+    dash.pos = fix.p;
+    dash.posAt = fix.at;
+    if (dash.onShift) {
+      dash.trail.push(fix.p);
+      if (dash.trail.length > TRAIL_POINTS) dash.trail.splice(0, dash.trail.length - TRAIL_POINTS);
+    }
+  }
+
+  // A message from the base: t=0 dashboard to server, t=HOP server to phone, t=2 HOP the phone shows it.
+  function baseSends(name, atPhone) {
+    const t0 = performance.now();
+    lightHop('d2s', name);
+    if (!atPhone) return;
+    later(HOP_MS, () => {
+      lightHop('s2p', name);
+      later(HOP_MS, () => { atPhone(delayText(performance.now() - t0)); render(); });
+    });
+  }
+
+  /* ================================================================ caption */
+  const captionEl = $('#caption');
+  // Always written, even when the words repeat, so the live region announces every event.
+  function setCaption(text) { captionEl.textContent = text; }
+
+  /* ================================================================ phone actions */
+  function startShift() {
+    if (phone.onShift) return;
+    const now = Date.now();
+    walker.progress = 0;
+    walker.last = now;
+    phone.onShift = true;
+    phone.screen = 'home';
+    phone.deadline = now + CHECKIN_INTERVAL_MS;
+    phone.remindedFor = 0;
+    phone.overdueFor = 0;
+    phone.status = STATUS.sending;
+    phone.nextPositionAt = now + POSITION_EVERY_MS;
+    phone.trail = [jacobNow()];
+    let deadline = 0;
+    phoneSends('shift start', {
+      atServer(at) { srv.onShift = true; srv.missedFor = 0; deadline = srv.deadline = at + CHECKIN_INTERVAL_MS; },
+      atBase(delay) {
+        dash.onShift = true;
+        dash.deadline = deadline;
+        dash.lastCheckinAt = 0;
+        dash.trail = [];
+        setCaption('Base saw the shift start ' + delay + ' after the tap.');
+      },
+      atPhone() { if (phone.onShift) { phone.deadline = deadline; phone.status = STATUS.shiftStarted; } }
+    });
+    render();
+  }
+
+  function checkIn() {
+    if (!phone.onShift) return;
+    phone.deadline = Date.now() + CHECKIN_INTERVAL_MS;   // until the server's deadline comes back
+    phone.status = STATUS.sending;
+    if (phone.fall) phone.fall.showStatus = true;
+    let deadline = 0, checkedAt = 0;
+    phoneSends('check-in', {
+      // the server stamps the check-in as it arrives, so the base shows "Last check-in" + 30 s = "Check-in due"
+      atServer(at) { if (srv.onShift) { checkedAt = at; deadline = srv.deadline = at + CHECKIN_INTERVAL_MS; } },
+      atBase(delay) {
+        if (!dash.onShift || !deadline) return;
+        dash.deadline = deadline;
+        dash.lastCheckinAt = checkedAt;
+        const missed = activeAlert('missed');
+        if (missed) {
+          endAlert(missed, 'cleared', 'check-in received');
+          setCaption('The late check-in reached base ' + delay + ' after the tap and cleared the missed check-in.');
+        } else {
+          setCaption('Base got the check-in ' + delay + ' after the tap. The next one is due in ' + (CHECKIN_INTERVAL_MS / 1000) + ' s.');
+        }
+      },
+      atPhone() { if (phone.onShift && deadline) { phone.deadline = deadline; phone.status = STATUS.received; } }
+    });
+    render();
+  }
+
+  function endShift() {
+    if (!phone.onShift || phone.sos || phone.fall) return;
+    walker.rest = jacobNow();   // he stays where he ended the shift; the base keeps that as his last position
+    phone.onShift = false;
+    phone.deadline = 0;
+    phone.status = STATUS.none;
+    phone.trail = [];
+    sound.stopChime();
+    phoneSends('shift end', {
+      atServer() { srv.onShift = false; srv.deadline = 0; },
+      atBase() {
+        dash.onShift = false;
+        dash.deadline = 0;
+        dash.trail = [];
+        const missed = activeAlert('missed');
+        if (missed) endAlert(missed, 'closed', 'shift ended');
+        setCaption('Shift ended: base shows Off shift and the alarms are off.');
+      }
+    });
+    render();
+  }
+
+  function sendPosition() {
+    const fix = phoneSends('position', {});
+    phone.trail.push(fix.p);
+    if (phone.trail.length > 400) phone.trail.shift();
+  }
+
+  function sendSos(viaHelp) {
+    if (!phone.onShift || phone.sos) return;
+    const mine = phone.sos = { ref: phone.nextRef++, acked: false, search: false };
+    const fallRef = viaHelp && phone.fall ? phone.fall.ref : 0;
+    if (viaHelp) phone.fall = null;
+    phone.screen = 'sos';
+    phoneSends('SOS', {
+      atBase(delay) {
+        if (fallRef) {
+          const fall = activeAlertFor('fall', fallRef);
+          if (fall) endAlert(fall, 'closed', 'ranger asked for help');
+        }
+        if (!activeAlert('sos')) openAlert('sos', 'red', { phoneRef: mine.ref });
+        setCaption(viaHelp ? 'The ranger asked for help: base got an SOS ' + delay + ' later.' : 'Base got the SOS ' + delay + ' after the slide.');
+      },
+      atPhone() { if (phone.sos === mine) mine.acked = true; }
+    });
+    render();
+  }
+
+  function cancelSos() {
+    if (!phone.sos) return;
+    const ref = phone.sos.ref;
+    phone.sos = null;
+    if (phone.screen === 'sos') phone.screen = 'home';
+    phone.status = STATUS.sending;
+    phoneSends('SOS cancel', {
+      atBase(delay) {
+        const sos = activeAlertFor('sos', ref);
+        if (!sos) return;
+        endAlert(sos, 'cleared', 'SOS cancelled by ranger');
+        setCaption('The ranger cancelled the SOS: base cleared it ' + delay + ' later.');
+      },
+      atPhone() { if (!phone.sos) phone.status = STATUS.sosCancelled; }
+    });
+    render();
+  }
+
+  function simulateFall() {
+    if (!phone.onShift || phone.sos || phone.fall) return;
+    const mine = phone.fall = { ref: phone.nextRef++, endsAt: Date.now() + FALL_COUNTDOWN_MS, noResponseSent: false, alerted: false, search: false, showStatus: false };
+    phone.screen = 'fall';
+    setCaption('Possible fall: the phone counts down ' + (FALL_COUNTDOWN_MS / 1000) + ' s for the ranger to answer.');
+    phoneSends('fall', {
+      atBase() { if (!activeAlert('fall')) openAlert('fall', 'amber', { phoneRef: mine.ref, countdownEndsAt: mine.endsAt, peak: PEAK_FORCE_G }); }
+    });
+    render();
+  }
+
+  function fallRanOut(mine) {
+    mine.noResponseSent = true;
+    phoneSends('fall', {   // the no-response message is part of the fall story, so it carries the fall's name
+      atBase(delay) {
+        const fall = activeAlertFor('fall', mine.ref);
+        if (!fall || fall.level === 'red') return;
+        fall.level = 'red';
+        addLog(fall, fall.state === 'search' ? 'Search party sent' : 'Open', 'countdown ran out');
+        setCaption('Fall countdown ran out: base alerted ' + delay + ' later.');
+      },
+      atPhone() { if (phone.fall === mine) mine.alerted = true; }
+    });
+  }
+
+  function imOk() {
+    if (!phone.fall) return;
+    const ref = phone.fall.ref;
+    phone.fall = null;
+    phone.screen = 'home';
+    phone.status = STATUS.sending;
+    phoneSends("I'm OK", {
+      atBase(delay) {
+        const fall = activeAlertFor('fall', ref);
+        if (!fall) return;
+        endAlert(fall, 'cleared', "ranger pressed I'm OK");
+        setCaption("The ranger held I'm OK: base cleared the fall " + delay + ' later.');
+      },
+      atPhone() { if (!phone.fall) phone.status = STATUS.imOk; }
+    });
+    render();
+  }
+
+  function openPhoneMap() {
+    phone.screen = 'map';
+    setCaption("The phone's map shows the ranger's own position and trail.");
+    render();
+    showPhoneMap();
+  }
+
+  /* ================================================================ base actions */
+  function baseAction(act, id) {
+    const a = dash.alerts.find((x) => x.id === id);
+    if (!a || !isActive(a)) return;
+    if (act === 'map') { showOnMap(); return; }
+    if (act === 'silence') {
+      if (a.level !== 'red' || a.state !== 'open' || a.silenced) return;
+      a.silenced = true;
+      addLog(a, 'Open', 'Silenced');
+      setCaption(a.type === 'sos' ? 'Base silenced the alarm. The SOS stays open.' : 'Base silenced the alarm. The alert stays open.');
+      baseSends('silence');
+    } else if (act === 'search') {
+      if (a.state !== 'open') return;
+      a.state = 'search';
+      addLog(a, 'Search party sent', 'sent by base');
+      baseSends('search party sent', (delay) => {
+        // the alert may have ended while the message travelled (a late check-in, I'm OK, a cancel): then the
+        // phone has nothing to show it on, and the caption stays on the event that ended it
+        if (!isActive(a) || !phoneHolds(a)) return;
+        if (a.type === 'sos') phone.sos.search = true;
+        else if (a.type === 'fall') phone.fall.search = true;
+        else phone.status = STATUS.helpComing;
+        setCaption('Base sent a search party. The phone showed it ' + delay + ' later.');
+      });
+    } else if (act === 'found' || act === 'false') {
+      const found = act === 'found';
+      endAlert(a, 'closed', found ? 'Ranger found' : 'False alarm');
+      setCaption(found ? 'Ranger found: the alert moved to the log.' : 'False alarm: the alert moved to the log.');
+      baseSends(found ? 'ranger found' : 'false alarm', () => phoneAlertClosed(a));
+    }
+    render();
+  }
+  // Does the phone still hold the alert a base reply is about? An SOS or a fall must be the same one (by its
+  // number): a reply about one that ended on its way must not touch a new one the ranger raised meanwhile.
+  // A missed check-in is held while the phone is still overdue.
+  function phoneHolds(a) {
+    if (a.type === 'sos') return !!phone.sos && phone.sos.ref === a.phoneRef;
+    if (a.type === 'fall') return !!phone.fall && phone.fall.ref === a.phoneRef;
+    return phone.onShift && phone.deadline > 0 && Date.now() >= phone.deadline;
+  }
+  function phoneAlertClosed(a) {
+    if (!phoneHolds(a)) return;
+    if (a.type === 'sos') {
+      phone.sos = null;
+      if (phone.screen === 'sos') phone.screen = 'home';
+    } else if (a.type === 'fall') {
+      phone.fall = null;
+      if (phone.screen === 'fall') phone.screen = 'home';
+    }
+    phone.status = STATUS.closedByBase;
+  }
+
+  /* ================================================================ the clock: every tick */
+  function tick() {
+    const now = Date.now();
+    stepWalker(now);
+    if (phone.onShift) {
+      // the reminder chime, once per deadline
+      if (phone.deadline && phone.remindedFor !== phone.deadline && now >= phone.deadline - REMINDER_BEFORE_MS && now < phone.deadline) {
+        phone.remindedFor = phone.deadline;
+        sound.chime();
+        // the chime always plays; the caption stays on an SOS or a fall while one is the story on screen
+        if (!phone.sos && !phone.fall) setCaption('Check-in due in ' + (REMINDER_BEFORE_MS / 1000) + ' s: the phone chimes to remind the ranger.');
+      }
+      // the overdue card takes over the phone's map screen, by the phone's own clock
+      if (phone.deadline && now >= phone.deadline && phone.overdueFor !== phone.deadline) {
+        phone.overdueFor = phone.deadline;
+        if (phone.screen === 'map') phone.screen = 'home';
+      }
+      if (now >= phone.nextPositionAt) {
+        phone.nextPositionAt = Math.max(phone.nextPositionAt + POSITION_EVERY_MS, now + 1);
+        sendPosition();
+      }
+    }
+    if (phone.fall && !phone.fall.noResponseSent && now >= phone.fall.endsAt) fallRanOut(phone.fall);
+    serverWatch(now);
+    stepDecor(now);
+    render();
+  }
+
+  // The server spots a deadline that passed with no check-in, and tells the dashboard. Once sent, the message
+  // arrives: a check-in that was still on its way at the deadline reaches base after it and clears the alert.
+  // A shift end that reached the server meanwhile (tapped just before the deadline) drops it: no missed
+  // check-in for a ranger who has gone off shift.
+  function serverWatch(now) {
+    if (!srv.onShift || !srv.deadline || now < srv.deadline || srv.missedFor === srv.deadline) return;
+    srv.missedFor = srv.deadline;
+    lightHop('s2d', 'missed check-in');
+    later(HOP_MS, () => {
+      if (!srv.onShift || activeAlert('missed')) return;
+      openAlert('missed', 'amber');
+      setCaption('No check-in by the deadline: base shows a missed check-in with the last position.');
+      render();
+    });
+  }
+
+  function stepDecor(now) {
+    decor.forEach((d) => {
+      if (now >= d.nextReportAt) {
+        d.pos = decorPoint(d, now);
+        d.lastHeardAt = now;
+        d.trail.push(d.pos);
+        if (d.trail.length > TRAIL_POINTS) d.trail.shift();
+        d.nextReportAt = now + DECOR_REPORT_MS;
+      }
+      if (now >= d.nextCheckinAt) {
+        d.lastCheckinAt = now;
+        d.lastHeardAt = now;
+        d.deadline = now + CHECKIN_INTERVAL_MS;
+        d.nextCheckinAt = now + rand(DECOR_CHECKIN_MIN_MS, DECOR_CHECKIN_MAX_MS);
+      }
+    });
+  }
+
+  /* ================================================================ sound (Web Audio, no files) */
+  const sound = (function () {
+    let ctx = null, master = null;
+    let unlocked = false, muted = false;
+    const want = { phoneAlarm: false, siren: false };
+    const loops = { phoneAlarm: null, siren: null };
+    const notes = new Set();   // chime notes still playing, so Reset and End shift can stop them
+    const AHEAD_S = 1.5;
+    const CYCLE = { phoneAlarm: 1.22, siren: 1.0 };
+
+    function unlock() {
+      if (unlocked) return;
+      unlocked = true;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = muted ? 0 : 1;
+        master.connect(ctx.destination);
+        if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(() => {});
+      } catch (e) { ctx = null; master = null; }
+      sync();
+    }
+    function setMuted(m) {
+      muted = m;
+      if (!ctx) return;
+      try {
+        const t = ctx.currentTime;
+        master.gain.cancelScheduledValues(t);
+        master.gain.setValueAtTime(master.gain.value, t);
+        master.gain.linearRampToValueAtTime(m ? 0 : 1, t + 0.02);
+      } catch (e) { /* silent */ }
+    }
+    function set(name, on) { if (want[name] !== on) { want[name] = on; sync(); } }
+    function sync() {
+      Object.keys(want).forEach((name) => {
+        if (want[name] && !loops[name] && ctx) loops[name] = startLoop(name);
+        else if (!want[name] && loops[name]) { stopLoop(loops[name]); loops[name] = null; }
+      });
+      pump();
+    }
+    function startLoop(name) {
+      try {
+        const osc = ctx.createOscillator();
+        const env = ctx.createGain();
+        const out = ctx.createGain();
+        osc.type = name === 'siren' ? 'triangle' : 'square';
+        osc.frequency.value = name === 'siren' ? 960 : 1000;
+        env.gain.value = 0;
+        out.gain.value = 1;
+        osc.connect(env); env.connect(out); out.connect(master);
+        const start = ctx.currentTime + 0.03;
+        osc.start(start);
+        return { name: name, osc: osc, env: env, out: out, nextAt: start };
+      } catch (e) { return null; }
+    }
+    function scheduleCycle(loop, t) {
+      const g = loop.env.gain;
+      if (loop.name === 'siren') {
+        loop.osc.frequency.setValueAtTime(960, t);
+        loop.osc.frequency.setValueAtTime(770, t + 0.5);
+        if (!loop.rampedIn) { g.setValueAtTime(0, t); g.linearRampToValueAtTime(0.2, t + 0.02); loop.rampedIn = true; }
+      } else {
+        for (let k = 0; k < 3; k++) {
+          const b = t + k * 0.24;
+          g.setValueAtTime(0, b);
+          g.linearRampToValueAtTime(0.15, b + 0.005);
+          g.setValueAtTime(0.15, b + 0.115);
+          g.linearRampToValueAtTime(0, b + 0.12);
+        }
+      }
+    }
+    function pump() {
+      if (!ctx) return;
+      Object.values(loops).forEach((loop) => {
+        if (!loop) return;
+        try {
+          while (loop.nextAt < ctx.currentTime + AHEAD_S) {
+            scheduleCycle(loop, loop.nextAt);
+            loop.nextAt += CYCLE[loop.name];
+          }
+        } catch (e) { /* silent */ }
+      });
+    }
+    function stopLoop(loop) {
+      if (!loop) return;
+      try {
+        const t = ctx.currentTime;
+        loop.out.gain.cancelScheduledValues(t);
+        loop.out.gain.setValueAtTime(loop.out.gain.value, t);
+        loop.out.gain.linearRampToValueAtTime(0, t + 0.02);
+        loop.osc.stop(t + 0.04);
+        loop.osc.onended = () => { try { loop.osc.disconnect(); loop.env.disconnect(); loop.out.disconnect(); } catch (e) { /* silent */ } };
+      } catch (e) { /* silent */ }
+    }
+    function note(freq, t) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.3, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      const out = ctx.createGain();
+      osc.connect(g); g.connect(out); out.connect(master);
+      osc.start(t);
+      osc.stop(t + 0.62);
+      const n = { osc: osc, out: out };
+      notes.add(n);
+      osc.onended = () => { notes.delete(n); try { osc.disconnect(); g.disconnect(); out.disconnect(); } catch (e) { /* silent */ } };
+    }
+    function chime() {
+      if (!ctx) return;
+      try { const t = ctx.currentTime + 0.02; note(1320, t); note(880, t + 0.18); } catch (e) { /* silent */ }
+    }
+    // Like stopLoop: a 20 ms fade, then stop, so nothing clicks.
+    function stopChime() {
+      notes.forEach((n) => {
+        try {
+          const t = ctx.currentTime;
+          n.out.gain.cancelScheduledValues(t);
+          n.out.gain.setValueAtTime(n.out.gain.value, t);
+          n.out.gain.linearRampToValueAtTime(0, t + 0.02);
+          n.osc.stop(t + 0.04);
+        } catch (e) { /* silent */ }
+      });
+    }
+    function stopAll() { want.phoneAlarm = false; want.siren = false; sync(); stopChime(); }
+    return {
+      unlock: unlock, set: set, pump: pump, chime: chime, stopChime: stopChime, stopAll: stopAll,
+      setMuted: setMuted,
+      get unlocked() { return unlocked; },
+      get muted() { return muted; },
+      get want() { return { phoneAlarm: want.phoneAlarm, siren: want.siren }; }
+    };
+  })();
+
+  /* ================================================================ the slider */
+  function makeSlider(root, onDone, tapCaption, earlyCaption) {
+    const track = root.querySelector('.track');
+    const handle = root.querySelector('.handle');
+    const fill = root.querySelector('.fill');
+    const inv = root.querySelector('.words-inv');
+    let drag = null;      // { id, startX, scale, travel, x0, x, moved }
+    let tap = null;       // pointer id of a press outside the handle
+    let snapTimer = 0;
+    let atRest = false;
+
+    function place(x, animate) {
+      atRest = x === 0 && !animate;
+      root.classList.toggle('snapping', !!animate);
+      handle.style.transform = x ? 'translateX(' + x + 'px)' : '';
+      fill.style.width = (x + HANDLE_W) + 'px';
+      inv.style.clipPath = 'inset(0 calc(100% - ' + (HANDLE_INSET + x + HANDLE_W) + 'px) 0 0)';
+    }
+    function travelOf() { return track.offsetWidth - 2 - 2 * HANDLE_INSET - HANDLE_W; }
+    // The handle's offset part-way through the snap-back, in design px (the transform sits inside the scaled phone).
+    function handleOffset() {
+      try {
+        const t = getComputedStyle(handle).transform;
+        return t && t !== 'none' ? Math.max(0, new DOMMatrix(t).m41) : 0;
+      } catch (err) { return 0; }
+    }
+    function finish() { drag = null; place(0, false); onDone(); }
+    function snapBack() {
+      drag = null;
+      place(0, true);
+      cancel(snapTimer);
+      snapTimer = later(SNAP_BACK_MS, () => root.classList.remove('snapping'));
+    }
+
+    track.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || drag) return;
+      e.preventDefault();
+      if (e.target === handle) {
+        const rect = track.getBoundingClientRect();
+        const scale = rect.width / track.offsetWidth || 1;
+        // grabbed while it is still snapping back: hold it where it is now, under the pointer
+        const x0 = root.classList.contains('snapping') ? handleOffset() : 0;
+        cancel(snapTimer);
+        place(x0, false);
+        drag = { id: e.pointerId, startX: e.clientX, scale: scale, travel: travelOf(), x0: x0, x: x0, moved: false };
+        try { handle.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
+      } else {
+        tap = e.pointerId;
+      }
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = (e.clientX - drag.startX) / drag.scale;
+      if (Math.abs(dx) >= TAP_SLOP_PX) drag.moved = true;
+      drag.x = Math.min(drag.travel, Math.max(0, drag.x0 + dx));
+      place(drag.x, false);
+      if (drag.x >= drag.travel) finish();
+    });
+    function release(e, cancelled) {
+      if (drag && e.pointerId === drag.id) {
+        if (cancelled) { snapBack(); return; }
+        if (!drag.moved) { if (drag.x0 > 0) snapBack(); else { drag = null; place(0, false); } setCaption(tapCaption); return; }
+        if (drag.x >= SLIDE_COMPLETE * drag.travel) { finish(); return; }
+        snapBack();
+        setCaption(earlyCaption);
+      }
+    }
+    handle.addEventListener('pointerup', (e) => release(e, false));
+    handle.addEventListener('pointercancel', (e) => release(e, true));
+    handle.addEventListener('lostpointercapture', (e) => { if (drag && e.pointerId === drag.id) release(e, false); });
+    track.addEventListener('pointerup', (e) => { if (tap === e.pointerId) { tap = null; setCaption(tapCaption); } });
+    track.addEventListener('pointerleave', (e) => { if (tap === e.pointerId) tap = null; });
+    root.querySelector('.sr-action').addEventListener('click', () => onDone());
+
+    function reset() {
+      if (atRest && !drag && tap === null) return;
+      if (drag) { try { handle.releasePointerCapture(drag.id); } catch (err) { /* gone */ } }
+      drag = null; tap = null;
+      cancel(snapTimer);
+      place(0, false);
+    }
+    place(0, false);
+    return { root: root, reset: reset, get busy() { return !!drag; } };
+  }
+
+  /* ================================================================ hold to confirm */
+  function makeHold(btn, onDone) {
+    let timer = 0;
+    function start() {
+      if (timer) return;
+      btn.classList.remove('holding');
+      void btn.offsetWidth;   // restart the ring from empty
+      btn.classList.add('holding');
+      timer = later(HOLD_MS, () => { timer = 0; btn.classList.remove('holding'); onDone(); });
+    }
+    function stop(hint) {
+      if (!timer) return;
+      cancel(timer);
+      timer = 0;
+      btn.classList.remove('holding');
+      if (hint) setCaption(HOLD_HINT);
+    }
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      // A touch is captured by the element it lands on. Let it go, so sliding off the pill fires pointerleave.
+      const t = e.target;
+      if (t.hasPointerCapture && t.hasPointerCapture(e.pointerId)) t.releasePointerCapture(e.pointerId);
+      start();
+    });
+    btn.addEventListener('pointerup', () => stop(true));
+    btn.addEventListener('pointerleave', () => stop(true));
+    btn.addEventListener('pointercancel', () => stop(true));
+    btn.addEventListener('keydown', (e) => {
+      if (e.key !== ' ' && e.key !== 'Enter') return;
+      e.preventDefault();
+      if (!e.repeat) start();
+    });
+    btn.addEventListener('keyup', (e) => {
+      if (e.key !== ' ' && e.key !== 'Enter') return;
+      e.preventDefault();
+      stop(true);
+    });
+    btn.addEventListener('blur', () => stop(false));
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
+    return { cancel: () => stop(false) };
+  }
+
+  /* ================================================================ maps */
+  const hasLeaflet = typeof window.L === 'object' && window.L !== null && typeof window.L.map === 'function';
+  let baseMap = null, phoneMap = null, popupTimer = 0;
+  const baseLayers = {};   // id -> { marker, trail, cls }
+  let me = null;           // phone map: { dot, ring, trail }
+
+  function mapOffline(el) {
+    const box = document.createElement('div');
+    box.className = 'map-offline';
+    box.textContent = 'The map needs an internet connection';
+    el.appendChild(box);
+  }
+  function styleMapLabels(el) {
+    el.style.setProperty('--map-label', MAP_COLOURS.label);
+    el.style.setProperty('--map-halo', MAP_COLOURS.labelHalo);
+  }
+  function newMap(el, onResize) {
+    styleMapLabels(el);
+    const map = L.map(el, { zoomControl: true, attributionControl: true, zoomSnap: 0.25, keyboard: true });
+    map.setView(BASE_POINT, 14, { animate: false });   // a view first, so every layer below is added at once
+    map.attributionControl.setPrefix(false);
+    L.tileLayer(TILE_URL, { maxZoom: 18, attribution: ATTRIBUTION }).addTo(map);
+    new ResizeObserver(() => {
+      map.invalidateSize({ animate: false });   // keeps the centre
+      if (onResize) onResize();
+    }).observe(el);
+    return map;
+  }
+
+  // Site names sit to the right of their dots. On the base map a name that would run past the edge, or over
+  // another name, a site dot, a ranger or a map control, moves up or down a little, then above or below its
+  // dot, then to the left of it; on a small map it may also break onto two lines. It takes the first spot
+  // that covers nothing, else the one that covers least. A name with no spot clear of the other names and
+  // inside the map (a very small map) is left out rather than printed over another; zooming in brings it back.
+  const LABEL_GAP = 11;    // dot centre to the name: clear of a ranger marker standing on the dot
+  const LABEL_SPOTS = {     // [side, dy in label heights]: side 1 right, 0 centred above (dy < 0) or below, -1 left
+    oneLine: [[1, 0], [1, -0.7], [1, 0.7], [1, -1.4], [1, 1.4], [0, -1], [0, 1], [-1, 0], [-1, -0.7], [-1, 0.7], [-1, -1.4], [-1, 1.4]],
+    twoLine: [[1, 0], [1, -0.5], [1, 0.5], [0, -1], [0, 1], [-1, 0], [-1, -0.5], [-1, 0.5], [1, -1], [1, 1], [-1, -1], [-1, 1]]
+  };
+  let siteLabels = [];     // base map: { marker, latlng }
+
+  // "Ranger Base, Port Stewart": the line break after the comma (or before the last word) shows only on two lines.
+  function labelHtml(name) {
+    const cut = name.indexOf(', ') >= 0 ? name.indexOf(', ') + 2 : name.lastIndexOf(' ') + 1;
+    return cut > 0 ? esc(name.slice(0, cut)) + '<br class="lb">' + esc(name.slice(cut)) : esc(name);
+  }
+
+  function addSites(map) {
+    L.geoJSON(SITES, {
+      pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+        radius: 6, weight: 2.2, color: MAP_COLOURS.siteOutline, opacity: 1,
+        fillColor: MAP_COLOURS[f.properties.kind], fillOpacity: 1, interactive: false
+      })
+    }).addTo(map);
+    return SITES.features.map((f) => {
+      const latlng = L.latLng(f.geometry.coordinates[1], f.geometry.coordinates[0]);
+      const marker = L.marker(latlng, {
+        icon: L.divIcon({ className: 'site-label', html: labelHtml(f.properties.name), iconSize: null, iconAnchor: [-LABEL_GAP, 8] }),
+        interactive: false, keyboard: false
+      }).addTo(map);
+      return { marker: marker, latlng: latlng };
+    });
+  }
+
+  function placeSiteLabels() {
+    if (!baseMap) return;
+    const size = baseMap.getSize();
+    const box = (x, y, w, h, weight) => ({ l: x, t: y, r: x + w, b: y + h, weight: weight });
+    const overlap = (a, c) => Math.max(0, Math.min(a.r, c.r) - Math.max(a.l, c.l)) * Math.max(0, Math.min(a.b, c.b) - Math.max(a.t, c.t));
+    const at = (latlng) => baseMap.latLngToContainerPoint(latlng);
+    // What a name should not cover, and how much each costs: another name or a map control most, then a site
+    // dot, then a ranger (the rangers move on anyway).
+    const fixed = [];
+    siteLabels.forEach((s) => { const p = at(s.latlng); fixed.push(box(p.x - 8, p.y - 8, 16, 16, 3)); });
+    [dash.pos].concat(decor.map((d) => d.pos)).forEach((pos) => { const p = at(pos); fixed.push(box(p.x - 10, p.y - 10, 20, 20, 1)); });
+    const cr = baseMap.getContainer().getBoundingClientRect();
+    const k = cr.width / (size.x || 1);
+    baseMap.getContainer().querySelectorAll('.leaflet-control').forEach((c) => {
+      const r = c.getBoundingClientRect();
+      fixed.push(box((r.left - cr.left) / k, (r.top - cr.top) / k, r.width / k, r.height / k, 10));
+    });
+    // every spot each name could take, measured on one line and on two
+    const items = siteLabels.map((s) => {
+      const el = s.marker.getElement();
+      const p = at(s.latlng);
+      const spots = [];
+      [false, true].forEach((two) => {
+        if (!el) return;
+        el.classList.toggle('two-line', two);
+        const w = el.offsetWidth, h = el.offsetHeight;
+        LABEL_SPOTS[two ? 'twoLine' : 'oneLine'].forEach((spot) => {
+          const b = spot[0] === 0
+            ? box(p.x - w / 2, spot[1] < 0 ? p.y - 9 - h : p.y + 9, w, h, 10)
+            : box(spot[0] > 0 ? p.x + LABEL_GAP : p.x - LABEL_GAP - w, p.y - h / 2 + spot[1] * h, w, h, 10);
+          const outside = Math.max(0, 2 - b.l) + Math.max(0, b.r - size.x + 2) + Math.max(0, 2 - b.t) + Math.max(0, b.b - size.y + 2);
+          const cut = Math.max(0, -b.l) + Math.max(0, b.r - size.x) + Math.max(0, -b.t) + Math.max(0, b.b - size.y);   // past the edge
+          spots.push({ b: b, two: two, side: spot[0], cut: cut, base: outside * h * 40 + fixed.reduce((sum, t) => sum + overlap(b, t) * t.weight, 0) });
+        });
+      });
+      return { el: el, p: p, spots: spots };
+    }).filter((it) => it.el);
+    // One name at a time, in the given order, each taking its cheapest spot (the first that covers nothing).
+    const LEFT_OUT = 1e9;   // the cost of a name left out: any layout that shows more names wins
+    function layout(order) {
+      const names = [];
+      let total = 0;
+      const picks = order.map((i) => {
+        let best = null;
+        items[i].spots.some((sp) => {
+          const cost = sp.base + names.reduce((sum, t) => sum + overlap(sp.b, t) * t.weight, 0);
+          if (!best || cost < best.cost) best = { sp: sp, cost: cost };
+          return cost === 0;
+        });
+        const hidden = best.sp.cut > 0 || names.some((t) => overlap(best.sp.b, t) > 0);
+        if (!hidden) names.push(best.sp.b);
+        total += hidden ? LEFT_OUT : best.cost;
+        return { item: items[i], sp: best.sp, hidden: hidden };
+      });
+      return { total: total, picks: picks };
+    }
+    // Site order first; if some name still covers something, try every other order and keep the cheapest.
+    let best = layout(items.map((it, i) => i));
+    if (best.total > 0) {
+      permutations(items.map((it, i) => i)).forEach((order) => {
+        if (best.total === 0) return;
+        const r = layout(order);
+        if (r.total < best.total) best = r;
+      });
+    }
+    best.picks.forEach((pk) => {
+      const el = pk.item.el, b = pk.sp.b;
+      el.classList.toggle('two-line', pk.sp.two);
+      el.style.visibility = pk.hidden ? 'hidden' : '';
+      el.style.textAlign = pk.sp.side > 0 ? 'left' : pk.sp.side < 0 ? 'right' : 'center';
+      el.style.marginLeft = Math.round(b.l - pk.item.p.x) + 'px';
+      el.style.marginTop = Math.round(b.t - pk.item.p.y) + 'px';
+    });
+  }
+  function permutations(list) {
+    if (list.length < 2) return [list];
+    const out = [];
+    list.forEach((x, i) => permutations(list.slice(0, i).concat(list.slice(i + 1))).forEach((rest) => out.push([x].concat(rest))));
+    return out;
+  }
+
+  function homeBounds() {
+    const pts = ROUTE_A.concat(PATH_RANGER_A, PATH_RANGER_B, SITES.features.map((f) => [f.geometry.coordinates[1], f.geometry.coordinates[0]]));
+    return L.latLngBounds(pts);
+  }
+  // Extra room on the right: the site names are drawn to the right of their dots.
+  let baseFit = null;   // the view fitBaseMap last set; while the map still shows it, a resize fits it again
+  function fitBaseMap() {
+    if (!baseMap) return;
+    const size = baseMap.getSize();
+    if (!size.x || !size.y) return;
+    const labelRoom = Math.round(Math.min(150, Math.max(40, size.x * 0.25)));
+    baseMap.fitBounds(homeBounds(), { paddingTopLeft: [20, 20], paddingBottomRight: [labelRoom, 20], animate: false });
+    baseFit = { zoom: baseMap.getZoom(), centre: baseMap.getCenter() };
+    placeSiteLabels();
+  }
+  // Has the viewer panned or zoomed (or pressed Show on map) since the last fit?
+  function baseMapUntouched() {
+    if (!baseFit || baseMap.getZoom() !== baseFit.zoom) return false;
+    return baseMap.project(baseMap.getCenter(), baseFit.zoom).distanceTo(baseMap.project(baseFit.centre, baseFit.zoom)) < 2;
+  }
+  function rangerIcon(letter, cls) {
+    return L.divIcon({ className: 'rmark ' + cls, html: letter, iconSize: [20, 20], iconAnchor: [10, 10] });
+  }
+
+  function initBaseMap() {
+    const el = $('#baseMap');
+    if (!hasLeaflet) { mapOffline(el); return; }
+    try {
+      baseMap = newMap(el, () => { if (baseMapUntouched()) fitBaseMap(); });
+      const rangers = [{ id: 'J', letter: 'J', title: JACOB.name }].concat(decor.map((d) => ({ id: d.id, letter: d.letter, title: d.name })));
+      rangers.forEach((r) => {
+        baseLayers[r.id] = { trail: L.polyline([], { className: 'trail m-well', interactive: false }).addTo(baseMap) };
+      });
+      siteLabels = addSites(baseMap);
+      rangers.forEach((r) => {
+        const l = baseLayers[r.id];
+        l.cls = 'm-well';
+        l.marker = L.marker(BASE_POINT, { icon: rangerIcon(r.letter, l.cls), title: r.title, keyboard: false, zIndexOffset: 1000 }).addTo(baseMap);
+        l.letter = r.letter;
+      });
+      baseMap.on('zoomend', placeSiteLabels);
+      fitBaseMap();
+    } catch (e) { baseMap = null; el.textContent = ''; mapOffline(el); }
+  }
+
+  function showPhoneMap() {
+    const el = $('#phoneMap');
+    if (!hasLeaflet) { if (!el.firstChild) mapOffline(el); return; }
+    if (!phoneMap) {
+      try {
+        phoneMap = newMap(el);
+        addSites(phoneMap);
+        me = {
+          trail: L.polyline([], { className: 'me-trail', interactive: false }).addTo(phoneMap),
+          ring: L.circle(BASE_POINT, { radius: 25, className: 'me-ring', interactive: false }).addTo(phoneMap),
+          dot: L.circleMarker(BASE_POINT, { radius: 6, className: 'me-dot', interactive: false }).addTo(phoneMap)   // 14 px with its 2 px edge
+        };
+      } catch (e) { phoneMap = null; el.textContent = ''; mapOffline(el); return; }
+    }
+    phoneMap.invalidateSize({ pan: false });
+    renderPhoneMap();
+    centrePhoneMap();
+  }
+  // "My position" and every open of the map: centred on the dot, close enough to see the accuracy ring.
+  function centrePhoneMap() {
+    if (!phoneMap) return;
+    phoneMap.setView(jacobNow(), Math.max(phoneMap.getZoom(), PHONE_MAP_ZOOM), { animate: false });
+  }
+
+  function showOnMap() {
+    if (!baseMap) return;
+    const p = dash.pos;
+    baseMap.setView(p, 15, { animate: true });
+    const popup = L.popup({ closeButton: false, autoPan: false, className: 'rd-popup', offset: [0, -8] })
+      .setLatLng(p)
+      .setContent('<span class="pop-name">' + esc(JACOB.name) + '</span><span class="pop-meta mono">' + esc(coords(p)) + '</span>')
+      .openOn(baseMap);
+    cancel(popupTimer);
+    popupTimer = later(POPUP_MS, () => { if (baseMap) baseMap.closePopup(popup); });
+  }
+
+  /* ================================================================ rendering: phone */
+  const screenEl = $('#screen');
+  const screens = { home: $('#scrHome'), sos: $('#scrSos'), fall: $('#scrFall'), map: $('#scrMap') };
+  const el = {
+    sbTime: $('#sbTime'),
+    homeOn: $('#homeOn'), homeOff: $('#homeOff'),
+    dueCard: $('#dueCard'), dueLabel: $('#dueLabel'), dueValue: $('#dueValue'),
+    homeStatus: $('#homeStatus'),
+    btnEndShift: $('#btnEndShift'), btnFall: $('#btnFall'),
+    sosStatus: $('#sosStatus'), sosSeen: $('#sosSeen'),
+    fallCount: $('#fallCount'), fallAlerted: $('#fallAlerted'), fallSeen: $('#fallSeen'), fallStatus: $('#fallStatus'),
+    btnSound: $('#btnSound'),
+    alertsPill: $('#alertsPill'), alertsN: $('#alertsN'),
+    banners: $('#banners'), rangerList: $('#rangerList'),
+    logScroll: $('#logScroll'), logEmpty: $('#logEmpty'), logTable: $('#logTable'), logBody: $('#logBody')
+  };
+
+  function setStatus(p, st) {
+    p.className = p.className.replace(/\s*tone-\w+/g, '') + ' tone-' + st.tone;
+    p.classList.toggle('empty-line', !st.text);
+    setText(p.querySelector('.t'), st.text);
+  }
+  function homeStatus() {
+    if (phone.sos) {
+      if (phone.sos.search) return STATUS.helpComing;
+      return phone.sos.acked ? { text: 'SOS open · base alerted', tone: 'alert' } : STATUS.sending;
+    }
+    return phone.status;
+  }
+  function phoneFallRunning(now) { return !!(phone.fall && !phone.fall.noResponseSent && now < phone.fall.endsAt); }
+
+  // The control a keyboard user lands on when the one they were on disappears with a screen change.
+  function primaryControl() {
+    if (phone.screen === 'sos') return $('#sliderCancelSos .sr-action');
+    if (phone.screen === 'fall') return $('#holdOk');
+    if (phone.screen === 'map') return $('#btnMapBack');
+    return phone.onShift ? $('#btnCheckin') : $('#btnStartShift');
+  }
+
+  function renderPhone(now) {
+    const focused = screenEl.contains(document.activeElement) ? document.activeElement : null;
+    screenEl.classList.toggle('dark', phone.screen === 'fall');
+    setText(el.sbTime, statusBarTime(now));
+    Object.keys(screens).forEach((name) => { screens[name].hidden = phone.screen !== name; });
+
+    el.homeOn.hidden = !phone.onShift;
+    el.homeOff.hidden = phone.onShift;
+    if (phone.onShift) {
+      const left = phone.deadline - now;
+      const overdue = left <= 0;
+      el.dueCard.classList.toggle('overdue', overdue);
+      setText(el.dueLabel, overdue ? 'CHECK-IN OVERDUE' : 'NEXT CHECK-IN DUE IN');
+      setText(el.dueValue, countdown(left));
+      setStatus(el.homeStatus, homeStatus());
+    }
+    const sosOpen = !!phone.sos;
+    if (sliders.send.root.hidden !== sosOpen) { sliders.send.reset(); sliders.send.root.hidden = sosOpen; }
+    if (sliders.cancelHome.root.hidden !== !sosOpen) { sliders.cancelHome.reset(); sliders.cancelHome.root.hidden = !sosOpen; }
+    const alarmed = !!(phone.sos || phone.fall);
+    el.btnEndShift.disabled = alarmed;
+    el.btnFall.disabled = alarmed;
+    if (phone.screen !== 'home') { sliders.send.reset(); sliders.cancelHome.reset(); }
+
+    if (phone.screen === 'sos' && phone.sos) {
+      setStatus(el.sosStatus, phone.sos.acked ? { text: 'SOS received by base', tone: 'good' } : { text: 'Sending SOS…', tone: 'muted' });
+      el.sosSeen.hidden = !phone.sos.search;
+    } else {
+      sliders.cancelSos.reset();
+    }
+
+    if (phone.screen === 'fall' && phone.fall) {
+      setText(el.fallCount, countdown(phone.fall.endsAt - now));
+      el.fallAlerted.hidden = !phone.fall.alerted;
+      el.fallSeen.hidden = !phone.fall.search;
+      el.fallStatus.hidden = !phone.fall.showStatus || !phone.status.text;
+      if (!el.fallStatus.hidden) setStatus(el.fallStatus, phone.status);
+    } else {
+      holds.forEach((h) => h.cancel());
+    }
+
+    if (phone.screen === 'map') renderPhoneMap();
+    // focus was on a control that is now hidden: move it to the new screen instead of dropping it to the page
+    if (focused && !focused.getClientRects().length) {
+      const next = primaryControl();
+      if (next && !next.disabled) next.focus();
+    }
+  }
+
+  function renderPhoneMap() {
+    if (!phoneMap || !me) return;
+    const p = jacobNow();
+    me.dot.setLatLng(p);
+    me.ring.setLatLng(p);
+    me.trail.setLatLngs(phone.onShift ? phone.trail.concat([p]) : []);
+  }
+
+  /* ================================================================ rendering: dashboard */
+  const bannerEls = new Map();
+
+  function levelOfJacob(active) {
+    if (!dash.onShift && !active.length) return 'off';
+    if (active.some((a) => a.level === 'red')) return 'red';
+    if (active.length) return 'amber';
+    return 'well';
+  }
+  function sortAlerts(list) {
+    return list.slice().sort((a, b) => ((a.level === 'red' ? 0 : 1) - (b.level === 'red' ? 0 : 1)) || (b.openedAt - a.openedAt));
+  }
+
+  function buildBanner(a) {
+    const b = document.createElement('section');
+    b.className = 'banner';
+    b.setAttribute('aria-label', 'Alert for ' + JACOB.name);
+    b.innerHTML = '<p class="b-tag"></p><p class="b-head"><span class="b-name"></span><span class="b-opened"></span></p><p class="b-facts"></p><div class="b-actions"></div>';
+    b.dataset.id = a.id;
+    return b;
+  }
+  function bannerFacts(a, now) {
+    const pos = '<span class="mono">' + esc(coords(dash.pos)) + '</span>';
+    const age = '<span>Position age ' + ago(now - dash.posAt) + '</span>';
+    const heard = '<span>Last heard ' + ago(now - dash.lastHeardAt) + ' ago</span>';
+    if (a.type === 'sos') return pos + age + heard;
+    if (a.type === 'fall' && a.level === 'amber') {
+      return '<span class="strong">Fall countdown ' + countdown(a.countdownEndsAt - now) + '</span><span>Peak force ' + a.peak + ' g</span>' + pos + age;
+    }
+    if (a.type === 'fall') return '<span>Peak force ' + a.peak + ' g</span>' + pos + age + heard;
+    // No check-in yet this shift: the item is left out, as the real dashboard does.
+    const last = dash.lastCheckinAt ? '<span>Last check-in ' + clock(dash.lastCheckinAt) + '</span>' : '';
+    return last + '<span>Last position <span class="mono">' + esc(coords(dash.pos)) + '</span></span>' + age;
+  }
+  function bannerButtons(a) {
+    const ghost = 'btn btn-sm btn-ghost btn-accent';
+    const primary = 'btn btn-sm btn-primary btn-accent';
+    const btn = (act, cls, label, disabled) => '<button type="button" class="' + cls + '" data-act="' + act + '" data-id="' + a.id + '"' + (disabled ? ' disabled' : '') + '>' + label + '</button>';
+    let html = '';
+    if (a.state === 'open') {
+      if (a.level === 'red') html += btn('silence', ghost, 'Silence', a.silenced);
+      html += btn('search', primary, 'Search party sent');
+    }
+    html += btn('found', ghost, 'Ranger found') + btn('false', ghost, 'False alarm') + btn('map', ghost, 'Show on map');
+    return html;
+  }
+  function updateBanner(b, a, now) {
+    const urgent = a.level === 'red' && a.state === 'open' && !a.silenced;
+    const cls = 'banner banner-' + a.level + (urgent ? ' urgent' : '');
+    if (b.className !== cls) b.className = cls;
+    let tag = titleOf(a).toUpperCase() + ' · ' + (a.state === 'search' ? 'SEARCH PARTY SENT' : 'OPEN');
+    if (a.state === 'open' && a.silenced) tag += ' · SILENCED';
+    setText(b.children[0], tag);
+    setText(b.querySelector('.b-name'), JACOB.name);
+    setText(b.querySelector('.b-opened'), 'Opened ' + clock(a.openedAt));
+    setHtml(b.querySelector('.b-facts'), bannerFacts(a, now));
+    const key = a.state + '|' + a.level + '|' + a.silenced;
+    if (b.dataset.key !== key) {
+      b.dataset.key = key;
+      const actions = b.querySelector('.b-actions');
+      const hadFocus = actions.contains(document.activeElement) ? document.activeElement.dataset.act : null;
+      actions.innerHTML = bannerButtons(a);
+      if (hadFocus) {
+        const again = actions.querySelector('[data-act="' + hadFocus + '"]:not(:disabled)') || actions.querySelector('[data-act="found"]');
+        if (again) again.focus();
+      }
+    }
+  }
+  function renderBanners(now, active) {
+    const sorted = sortAlerts(active);
+    bannerEls.forEach((b, id) => { if (!sorted.some((a) => a.id === id)) { b.remove(); bannerEls.delete(id); } });
+    sorted.forEach((a, i) => {
+      let b = bannerEls.get(a.id);
+      if (!b) { b = buildBanner(a); bannerEls.set(a.id, b); }
+      if (el.banners.children[i] !== b) el.banners.insertBefore(b, el.banners.children[i] || null);
+      updateBanner(b, a, now);
+    });
+    el.banners.hidden = sorted.length === 0;
+  }
+
+  const rangerRows = {};
+  function buildRangerRows() {
+    el.rangerList.innerHTML = '';
+    [{ id: 'J', name: JACOB.name, simulated: false }].concat(decor.map((d) => ({ id: d.id, name: d.name, simulated: true }))).forEach((r) => {
+      const li = document.createElement('li');
+      li.className = 'rrow';
+      li.innerHTML = '<span class="dot"></span><div class="r-body">' +
+        '<div class="r-head"><span class="r-name">' + esc(r.name) + '</span>' + (r.simulated ? '<span class="tag">SIMULATED</span>' : '') + '<span class="r-shift"></span></div>' +
+        '<p class="r-alert" hidden></p><p class="r-fact r-due"></p><p class="r-fact r-heard"></p></div>';
+      el.rangerList.appendChild(li);
+      rangerRows[r.id] = { li: li, shift: li.querySelector('.r-shift'), alert: li.querySelector('.r-alert'), due: li.querySelector('.r-due'), heard: li.querySelector('.r-heard') };
+    });
+  }
+  function dueHtml(deadline, now) {
+    const left = deadline - now;
+    const when = 'Check-in due ' + clock(deadline) + ' ';
+    return left > 0 ? esc(when + '(in ' + Math.ceil(left / 1000) + ' s)') : esc(when) + '<span class="overdue">(overdue)</span>';
+  }
+  function renderRangers(now, active) {
+    const j = rangerRows.J;
+    const lvl = levelOfJacob(active);
+    const cls = 'rrow st-' + lvl;
+    if (j.li.className !== cls) j.li.className = cls;
+    setText(j.shift, dash.onShift ? 'On shift' : 'Off shift');
+    const top = sortAlerts(active)[0];
+    j.alert.hidden = !top;
+    if (top) {
+      j.alert.className = 'r-alert lvl-' + top.level;
+      setText(j.alert, titleOf(top) + ': ' + (top.state === 'search' ? 'Search party sent' : 'Open'));
+    }
+    j.due.hidden = !dash.onShift;
+    if (dash.onShift) setHtml(j.due, dueHtml(dash.deadline, now));
+    setText(j.heard, 'Last heard ' + ago(now - dash.lastHeardAt) + ' ago · Battery ' + JACOB.battery + '%');
+    decor.forEach((d) => {
+      const r = rangerRows[d.id];
+      if (r.li.className !== 'rrow st-well') r.li.className = 'rrow st-well';
+      setText(r.shift, 'On shift');
+      setHtml(r.due, dueHtml(d.deadline, now));
+      setText(r.heard, 'Last heard ' + ago(now - d.lastHeardAt) + ' ago · Battery ' + d.battery + '%');
+    });
+  }
+
+  let renderedLog = -1;
+  function renderLog() {
+    if (renderedLog === logVersion) return;
+    renderedLog = logVersion;
+    const rows = dash.log.slice(0, 8);
+    el.logEmpty.hidden = rows.length > 0;
+    el.logTable.hidden = rows.length === 0;
+    el.logBody.innerHTML = rows.map((r) => '<tr><td>' + esc(clock(r.at)) + '</td><td>' + esc(r.ranger) + '</td><td>' + esc(r.type) + '</td><td>' + esc(r.state) + '</td><td>' + esc(r.reason) + '</td></tr>').join('');
+    el.logScroll.scrollTop = 0;
+  }
+  // The log gives way down to its label, header and newest row. In a narrow card that row wraps onto two
+  // lines, so the floor is measured from the table on every redraw instead of fixed in the CSS.
+  const logPanel = $('.log-panel');
+  function fitLogFloor() {
+    const first = el.logBody.rows[0];
+    let floor = '';
+    if (!el.logTable.hidden && first) {
+      const chrome = logPanel.offsetHeight - el.logScroll.clientHeight;   // the label and the panel's borders
+      const below = parseFloat(getComputedStyle(el.logScroll).paddingBottom) || 0;
+      floor = Math.ceil(chrome + el.logTable.tHead.offsetHeight + first.offsetHeight + below) + 'px';
+    }
+    if (logPanel.style.minHeight !== floor) logPanel.style.minHeight = floor;
+  }
+
+  function renderMarkers(active) {
+    if (!baseMap) return;
+    const lvl = levelOfJacob(active);
+    const jl = baseLayers.J;
+    setRanger(jl, dash.pos, 'm-' + lvl, dash.onShift ? dash.trail : []);
+    decor.forEach((d) => setRanger(baseLayers[d.id], d.pos, 'm-well', d.trail));
+  }
+  function setRanger(layer, pos, cls, trail) {
+    const ll = layer.marker.getLatLng();
+    if (ll.lat !== pos[0] || ll.lng !== pos[1]) layer.marker.setLatLng(pos);
+    if (layer.cls !== cls) {
+      layer.cls = cls;
+      layer.marker.setIcon(rangerIcon(layer.letter, cls));
+      const path = layer.trail.getElement && layer.trail.getElement();
+      if (path) path.setAttribute('class', 'trail ' + cls);
+      layer.trail.options.className = 'trail ' + cls;
+    }
+    if (layer.trailKey !== trail.length + ':' + (trail[trail.length - 1] || '')) {
+      layer.trailKey = trail.length + ':' + (trail[trail.length - 1] || '');
+      layer.trail.setLatLngs(trail.length > 1 ? trail.concat([pos]) : []);
+    }
+  }
+
+  function renderDash(now) {
+    const active = dash.alerts.filter(isActive);
+    setText(el.alertsN, String(active.length));
+    el.alertsPill.classList.toggle('alerts-on', active.length > 0);
+    renderBanners(now, active);
+    renderRangers(now, active);
+    renderLog();
+    renderMarkers(active);
+  }
+
+  function renderSoundButton() {
+    const b = el.btnSound;
+    if (!sound.unlocked) return;
+    const text = sound.muted ? 'Sound off' : 'Sound on';
+    if (b.dataset.mode !== 'toggle') {
+      b.dataset.mode = 'toggle';
+      b.className = 'btn btn-sm btn-ghost btn-accent';
+    }
+    setText(b, text);
+    b.setAttribute('aria-pressed', sound.muted ? 'false' : 'true');
+  }
+
+  function render() {
+    const now = Date.now();
+    renderPhone(now);
+    renderDash(now);
+    fitLogFloor();
+    renderSoundButton();
+    const overdue = phone.onShift && phone.deadline && now >= phone.deadline;
+    // the phone alarm sounds while the overdue card is on screen (home) or a fall countdown runs
+    sound.set('phoneAlarm', phoneFallRunning(now) || !!(overdue && phone.screen === 'home'));
+    sound.set('siren', dash.alerts.some((a) => isActive(a) && a.level === 'red' && a.state === 'open' && !a.silenced));
+    sound.pump();
+  }
+
+  /* ================================================================ layout: scale the phone to fit */
+  const pageEl = $('#page');
+  const probe = $('#phoneProbe');
+  const stackedQuery = window.matchMedia(STACKED_QUERY);
+  let scale = 0;
+  // Side by side, the phone fits the height, and also shrinks so the dashboard keeps DASH_MIN_W.
+  function applyScale() {
+    const r = probe.getBoundingClientRect();
+    const cs = getComputedStyle(pageEl);
+    const inner = pageEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - parseFloat(cs.columnGap || 0);
+    let s = stackedQuery.matches ? r.width / 360 : Math.min(r.height / 740, (inner - DASH_MIN_W) / 360);
+    s = Math.max(0.3, Math.min(1, Math.floor(s * 1000) / 1000));
+    if (s !== scale) { scale = s; pageEl.style.setProperty('--s', String(s)); }
+  }
+
+  /* ================================================================ wiring */
+  const sliders = {
+    send: makeSlider($('#sliderSend'), () => sendSos(false),
+      'A tap does nothing. Slide the handle all the way to send an SOS.',
+      'The slider snapped back: it only sends after nine-tenths of the track.'),
+    cancelHome: makeSlider($('#sliderCancelHome'), cancelSos,
+      'A tap does nothing. Slide the handle all the way to cancel the SOS.',
+      'The slider snapped back: it only cancels after nine-tenths of the track.'),
+    cancelSos: makeSlider($('#sliderCancelSos'), cancelSos,
+      'A tap does nothing. Slide the handle all the way to cancel the SOS.',
+      'The slider snapped back: it only cancels after nine-tenths of the track.')
+  };
+  const holds = [makeHold($('#holdOk'), imOk), makeHold($('#holdHelp'), () => sendSos(true))];
+
+  $('#btnStartShift').addEventListener('click', startShift);
+  $('#btnCheckin').addEventListener('click', checkIn);
+  $('#btnFallCheckin').addEventListener('click', checkIn);
+  $('#btnEndShift').addEventListener('click', endShift);
+  $('#btnFall').addEventListener('click', simulateFall);
+  $('#btnMapOn').addEventListener('click', openPhoneMap);
+  $('#btnMapOff').addEventListener('click', openPhoneMap);
+  $('#btnMapBack').addEventListener('click', () => { phone.screen = 'home'; render(); });
+  $('#btnMyPos').addEventListener('click', () => centrePhoneMap());
+  $('#btnBackHome').addEventListener('click', () => { phone.screen = 'home'; render(); });
+  el.banners.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-act]');
+    if (b && !b.disabled) baseAction(b.dataset.act, Number(b.dataset.id));
+  });
+
+  // Browsers refuse sound before a click: the first click anywhere unlocks it.
+  let unlockClick = null;
+  document.addEventListener('click', (e) => {
+    if (sound.unlocked) return;
+    unlockClick = e;
+    sound.unlock();
+    render();
+  }, true);
+  // A double-click is one press. Its second click never presses a control, because the screen may have changed
+  // under the pointer (Search party sent gives its place to False alarm, Back to home to Check in); keyboard
+  // clicks have detail 0 and always count. When the first click pressed a control, the double-click does not
+  // reach a map either: a banner that closed leaves the base map under the pointer, and Leaflet zooms on it.
+  let pressWasControl = false;
+  document.addEventListener('click', (e) => {
+    const onControl = !!(e.target.closest && e.target.closest('button'));
+    if (e.detail <= 1) { pressWasControl = onControl; return; }
+    if (onControl || pressWasControl) e.stopPropagation();
+  }, true);
+  document.addEventListener('dblclick', (e) => { if (pressWasControl) e.stopPropagation(); }, true);
+  el.btnSound.addEventListener('click', (e) => {
+    if (e === unlockClick) return;
+    sound.setMuted(!sound.muted);
+    render();
+  });
+
+  function resetDemo() {
+    cancelAll();
+    Object.values(sliders).forEach((s) => s.reset());
+    holds.forEach((h) => h.cancel());
+    idleHops();
+    sound.stopAll();
+    popupTimer = 0;
+    if (baseMap) baseMap.closePopup();
+    initState();
+    bannerEls.forEach((b) => b.remove());
+    bannerEls.clear();
+    buildRangerRows();
+    fitBaseMap();
+    if (phoneMap) phoneMap.setView(BASE_POINT, PHONE_MAP_ZOOM, { animate: false });   // and every open of the phone map re-centres on Jacob
+    setCaption(CAPTION_START);
+    render();
+  }
+  $('#btnReset').addEventListener('click', resetDemo);
+
+  // Read-only view of the state for tests. The page never reads it.
+  window.__rdDemo = Object.freeze({
+    snapshot() {
+      const now = Date.now();
+      const p = jacobNow();
+      return JSON.parse(JSON.stringify({
+        phoneScreen: phone.screen,
+        onShift: phone.onShift,
+        deadline: phone.onShift ? phone.deadline : null,
+        alerts: dash.alerts.map((a) => ({ id: a.id, type: a.type, title: titleOf(a), level: a.level, state: a.state, silenced: a.silenced, openedAt: a.openedAt, reason: a.reason })),
+        log: dash.log.slice(0, 8),
+        sound: { unlocked: sound.unlocked, muted: sound.muted, phoneAlarm: sound.want.phoneAlarm, siren: sound.want.siren },
+        jacob: { lat: p[0], lng: p[1] },
+        base: { onShift: dash.onShift, deadline: dash.deadline, pos: dash.pos },
+        now: now
+      }));
+    }
+  });
+
+  /* ================================================================ start */
+  document.documentElement.style.setProperty('--hold-ms', HOLD_MS + 'ms');
+  document.documentElement.style.setProperty('--snap-ms', SNAP_BACK_MS + 'ms');
+  initState();
+  applyScale();
+  const scaleObserver = new ResizeObserver(applyScale);
+  scaleObserver.observe(probe);    // the height the phone may fill
+  scaleObserver.observe(pageEl);   // the width the dashboard needs
+  buildRangerRows();
+  initBaseMap();
+  render();
+  setInterval(tick, TICK_MS);
+})();
+</script>
+</body>
+</html>
