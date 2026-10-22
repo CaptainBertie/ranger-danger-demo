@@ -1,0 +1,96 @@
+<!doctype html><html><head><meta charset='utf-8'><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#E1D3BC;color:#302A22;font-family:'Montserrat',Arial,sans-serif;font-size:14px;line-height:1.35}
+.wrap{padding:4px 2px 8px;width:900px}
+.lead{font-weight:700;font-size:16px;color:#302A22;margin:0 0 14px}
+.grid{display:grid;gap:12px;margin-bottom:12px}
+.g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+.card{background:#F7EFE6;border-radius:14px;padding:14px 16px}
+.card.dark{background:#443225;color:#F7EFE6}
+.card.rust{background:#A85A38;color:#fff}
+.card.rose{background:#D6AC9D;color:#302A22}
+.ttl{font-weight:700;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#7B6C52;margin-bottom:10px}
+.card.dark .ttl,.card.rust .ttl{color:rgba(255,255,255,.75)}
+.tile{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+.ic{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#E1D3BC;flex:none}
+.ic svg{width:26px;height:26px;stroke:#A85A38;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ic.bad{background:#A85A38} .ic.bad svg{stroke:#fff}
+.ic.ok{background:#7B6C52} .ic.ok svg{stroke:#fff}
+.tile b{font-size:13px;font-weight:700} .tile span{font-size:12px;color:#7B6C52}
+.row{display:flex;gap:12px;align-items:stretch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:#E1D3BC;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.chip.r{background:#A85A38;color:#fff} .chip.o{background:#7B6C52;color:#fff}
+.stat .n{font-weight:700;font-size:28px;line-height:1;color:#A85A38} .stat .l{font-size:12px;margin-top:6px;font-weight:600} .stat .s{font-size:11px;color:#7B6C52;margin-top:3px}
+.card.dark .stat .n{color:#D6AC9D} .card.dark .stat .s{color:rgba(255,255,255,.7)}
+.card.rust .stat .n{color:#fff} .card.rust .stat .s{color:rgba(255,255,255,.8)}
+ul{list-style:none} li{position:relative;padding-left:16px;margin:4px 0;font-size:13px}
+li:before{content:"";position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:50%;background:#A85A38}
+.card.rust li:before{background:#fff} .card.dark li:before{background:#D6AC9D}
+.cite{font-size:10.5px;color:#7B6C52;margin-top:8px;line-height:1.3}
+.card.dark .cite,.card.rust .cite{color:rgba(255,255,255,.7)}
+.steps{display:flex;align-items:stretch}
+.step{flex:1;background:#F7EFE6;border-radius:14px;padding:18px 16px 14px 18px;position:relative}
+.step+.step{margin-left:22px}
+.card .step{background:#E1D3BC}
+.step .num{position:absolute;top:-10px;left:14px;width:26px;height:26px;border-radius:50%;background:#A85A38;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.step b{display:block;font-size:13.5px;margin:2px 0 6px}
+.step:after{content:"";position:absolute;right:-22px;top:50%;width:22px;height:2px;background:#7B6C52;margin-top:-1px}
+.step:last-child:after{display:none}
+.line{display:flex;align-items:center;gap:10px;font-size:13px;margin:6px 0}
+.line svg{width:22px;height:22px;flex:none;stroke:#A85A38;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.mean{background:#A85A38;color:#fff;border-radius:14px;padding:12px 16px}
+.mean .ttl{color:rgba(255,255,255,.8)}
+.mean li{font-size:13.5px;font-weight:600} .mean li:before{background:#fff}
+.note{font-size:12px;color:#7B6C52;font-style:italic;margin-top:6px}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:#E1D3BC;color:#7B6C52}
+.badge.bad{background:#A85A38;color:#fff} .badge.ok{background:#7B6C52;color:#fff}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#7B6C52;text-align:left;font-weight:700;padding:0 8px 6px}
+td{padding:6px 8px;border-top:1px solid #E1D3BC;vertical-align:middle}
+td.num,th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.src{color:#7B6C52;font-size:11.5px}
+tr.tot td{border-top:2px solid #7B6C52;font-weight:700}
+tr.opt td{color:#7B6C52;font-style:italic}
+.gate{background:#7B6C52;color:#fff;border-radius:14px;padding:10px 16px;display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.gate b{font-size:12px;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
+.gate span{font-size:12.5px}
+.who{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.who b{display:block;font-size:13.5px} .who span{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#A85A38}
+.risk{display:grid;grid-template-columns:44px 190px 1fr;gap:12px;align-items:center;background:#F7EFE6;border-radius:14px;padding:10px 14px;margin-bottom:8px}
+.risk b{font-size:13px} .risk .fix{font-size:12.5px}
+.risk .fix i{font-style:normal;font-weight:700;color:#A85A38;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;display:block;margin-bottom:2px}
+
+.flow{display:grid;grid-template-columns:1fr 1.15fr 1fr 1.15fr 1fr;align-items:center}
+.node{background:#443225;color:#F7EFE6;border-radius:14px;padding:12px 10px;text-align:center}
+.node b{display:block;font-size:13.5px} .node span{display:block;font-size:11px;color:rgba(247,239,230,.75);margin-top:2px}
+.pipe{padding:0 8px;display:flex;flex-direction:column;gap:4px}
+.pipe small{font-size:10.5px;text-align:center;color:#7B6C52;font-weight:600;line-height:1.2}
+.ln{height:2px;background:#7B6C52;position:relative;margin:3px 0}
+.ln:after{content:"";position:absolute;top:-4px;border:5px solid transparent}
+.ln.r:after{right:-3px;border-left:7px solid #7B6C52} .ln.l:after{left:-3px;border-right:7px solid #7B6C52}
+.dec{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:start}
+.dec b{display:block;font-size:13.5px;margin-bottom:2px} .dec p{font-size:12.5px}
+.dec .why{font-size:12px;color:#7B6C52;margin-top:3px}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar{display:grid;grid-template-columns:120px 1fr 64px;gap:10px;align-items:center;font-size:12.5px}
+.bar .tr{height:16px;background:#E1D3BC;border-radius:5px;overflow:hidden}
+.bar .fill{height:100%;background:#A85A38} .bar .fill.o{background:#7B6C52} .bar .fill.d{background:#443225}
+.bar .v{font-weight:700;text-align:right}
+.res{display:grid;grid-template-columns:44px 150px 1fr 120px;gap:12px;align-items:center;background:#F7EFE6;border-radius:14px;padding:10px 14px;margin-bottom:8px}
+.res b{font-size:13.5px} .res .how{font-size:12.5px} .res .out{text-align:right}
+.p{font-size:13px}
+ html,body{overflow:hidden} svg.fit{display:block;width:100%;height:auto}</style></head><body><svg class='fit' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 462' preserveAspectRatio='xMinYMin meet'><foreignObject x='0' y='0' width='900' height='462'><div xmlns='http://www.w3.org/1999/xhtml' class='wrap'>
+<p class="lead">A single-ranger app is straightforward to build. Reliable fall detection is where the real work and cost would go.</p>
+<div class="grid g2">
+ <div class="card"><div class="line"><svg viewBox="0 0 24 24"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/></svg><span><b>Building the app is the easy part.</b> Check-ins, SOS, GPS and the dashboard all worked for one ranger after a short build.</span></div></div>
+ <div class="card rust"><div class="line"><svg viewBox="0 0 24 24" style="stroke:#fff"><circle cx="15" cy="5" r="2"/><path d="M13 8l-4 4 3 3-2 5M9 12l-4-1M15 12l4 2"/><path d="M3 21h18"/></svg><span><b>Fall detection needs the most investment.</b> It needs tests with more people, rough ground and real ranger work, like driving on corrugated roads.</span></div></div>
+ <div class="card"><div class="line"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.5 11h10L20 7H6.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg><span><b>Buying could beat building.</b> Lone-worker safety apps with check-ins and fall alerts already exist. Licensing one could skip development costs (see Implementation).</span></div></div>
+ <div class="card"><div class="line"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.2 5 2.5 5 5.8"/></svg><span><b>Scaling is small.</b> The program would need at most about 50 users, so moving from 1 phone to 50 should be simple for the server.</span></div></div>
+</div>
+<div class="card dark" style="margin-bottom:12px"><div class="ttl">The real limits are out on Country, not on the server</div>
+ <div class="grid g2" style="margin:0">
+  <div class="line"><svg viewBox="0 0 24 24" style="stroke:#D6AC9D"><path d="M12 20v-4"/><circle cx="12" cy="14" r="1.5"/><path d="M8 10a6 6 0 0 1 8 0M5 7a10 10 0 0 1 14 0"/></svg><span>Dead zones between the 4WD and the ranger, which the WiFi relay has to cover</span></div>
+  <div class="line"><svg viewBox="0 0 24 24" style="stroke:#D6AC9D"><rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M21.5 10.5v3M6 10v4M9 10v4"/></svg><span>Phone battery over a full day of GPS and sensors</span></div>
+ </div></div>
+<div class="mean"><div class="ttl">Next step</div><ul><li>Trial the app with the rangers on one vehicle during the pilot, and use their falls, routes and feedback to tune it.</li></ul></div>
+</div></foreignObject></svg></body></html>
