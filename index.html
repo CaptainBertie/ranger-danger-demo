@@ -528,7 +528,11 @@ path.me-trail { stroke: var(--accent); stroke-width: 3; stroke-opacity: .9; fill
   }
   .strip { flex-wrap: wrap; row-gap: 6px; }
   .framed .open-full { display: inline-flex; }
+  .strip-right { flex: 1 1 100%; flex-wrap: wrap; row-gap: 6px; }
   .strip-left { flex: 1 1 100%; flex-wrap: wrap; row-gap: 2px; }
+  .strip-title { white-space: normal; }
+  /* a frame as narrow as 240 px (Google Sites on a phone): the base header wraps its pills under the logo */
+  .dash-head { height: auto; min-height: 36px; flex-wrap: wrap; row-gap: 6px; padding-top: 6px; padding-bottom: 6px; }
   .strip .timings { display: inline; white-space: normal; }
   .timings-diag { display: none; }
   .phone-col { display: flex; justify-content: center; }
@@ -555,6 +559,11 @@ path.me-trail { stroke: var(--accent); stroke-width: 3; stroke-opacity: .9; fill
   .arrow { width: 2px; height: 26px; margin: 2px 6px; }
   .hop-right .arrow::after { right: auto; left: 50%; top: auto; bottom: 0; transform: translateX(-50%) rotate(135deg); }
   .hop-left .arrow::after { left: 50%; top: 0; transform: translateX(-50%) rotate(-45deg); }
+}
+/* Under 300 px (the Google Sites embed on a small phone): the banner facts and ranger lines wrap instead of running wide. */
+@media (max-width: 299.98px) {
+  .b-facts > span { white-space: normal; overflow-wrap: anywhere; }
+  .r-fact { white-space: normal; text-overflow: clip; }
 }
 </style>
 </head>
