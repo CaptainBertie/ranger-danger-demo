@@ -170,6 +170,8 @@ p { margin: 0; }
 .timings { color: var(--text-2); font-size: var(--text-data-note); line-height: 1.35; }
 .strip .timings { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .strip-right { flex: none; display: flex; align-items: center; gap: 6px; }
+/* Shown only inside a frame on a narrow screen (the Google Site on a phone), where the frame is a small window. */
+.open-full { display: none; text-decoration: none; }
 /* The timings label sits in the strip when the strip is wide enough, otherwise in the diagram panel. */
 .timings-diag { display: none; }
 @media (min-width: 720px) and (max-width: 1099.98px) {
@@ -525,6 +527,7 @@ path.me-trail { stroke: var(--accent); stroke-width: 3; stroke-opacity: .9; fill
     row-gap: 10px;
   }
   .strip { flex-wrap: wrap; row-gap: 6px; }
+  .framed .open-full { display: inline-flex; }
   .strip-left { flex: 1 1 100%; flex-wrap: wrap; row-gap: 2px; }
   .strip .timings { display: inline; white-space: normal; }
   .timings-diag { display: none; }
@@ -564,6 +567,7 @@ path.me-trail { stroke: var(--accent); stroke-width: 3; stroke-opacity: .9; fill
       <span class="timings">Timings are sped up for the demo (real: 60 min check-in, 5 min fall countdown)</span>
     </div>
     <div class="strip-right">
+      <a class="btn btn-sm btn-primary btn-accent open-full" id="openFull" href="./" target="_blank" rel="noopener">Open full size</a>
       <button type="button" class="btn btn-sm btn-primary btn-accent" id="btnSound">Click to enable alarm sound</button>
       <button type="button" class="btn btn-sm btn-ghost btn-accent" id="btnReset">Reset demo</button>
     </div>
@@ -2129,6 +2133,12 @@ path.me-trail { stroke: var(--accent); stroke-width: 3; stroke-opacity: .9; fill
     const b = e.target.closest('button[data-act]');
     if (b && !b.disabled) baseAction(b.dataset.act, Number(b.dataset.id));
   });
+
+  // Inside a frame (the Google Site), the stacked layout shows a link that opens the demo in its own tab.
+  let framed = true;
+  try { framed = window.self !== window.top; } catch (e) { /* a cross-origin parent: framed */ }
+  if (framed) document.documentElement.classList.add('framed');
+  $('#openFull').href = location.href.split('#')[0];
 
   // Browsers refuse sound before a click: the first click anywhere unlocks it.
   let unlockClick = null;
