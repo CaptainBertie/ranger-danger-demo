@@ -5,3 +5,9 @@ A one-page demo of the Ranger Danger check-in prototype (UTS Introduction to Eng
 Everything runs in the browser from `index.html`. There is no server, no login and no stored data. The only network requests are for Leaflet (unpkg) and the Esri World Imagery map tiles.
 
 Live page: https://captainbertie.github.io/ranger-danger-demo/
+
+## Test walkthrough
+
+`tests/` holds a click-through record of the prototype tests (buttons, connection, GPS, fall detection). `tests/clips/` has one short clip per row of the automated button test, cut from the phone's screen recording.
+
+Live page: https://captainbertie.github.io/ranger-danger-demo/tests/

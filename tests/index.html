@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototype Test Walkthrough</title>
+<meta name="description" content="Click-through record of how team Ranger Danger tested the check-in prototype: buttons, connection, GPS and fall detection.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sand:#E1D3BC; --cream:#F7EFE6; --rust:#A85A38; --rose:#D6AC9D;
+  --olive:#7B6C52; --ink:#302A22; --dark:#443225; --darker:#33231A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--sand);color:var(--ink);font-family:'Montserrat',Arial,sans-serif;font-size:14px;line-height:1.38}
+body{padding:8px 10px 6px}
+.shell{max-width:900px;margin:0 auto}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+button:focus-visible{outline:2px solid var(--rust);outline-offset:2px}
+
+/* top bar: the four tests */
+.top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.top .brand{font-weight:700;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--olive);margin-right:6px}
+.tab{background:var(--cream);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
+.tab .d{width:18px;height:18px;border-radius:50%;background:var(--sand);display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--olive)}
+.tab.on{background:var(--rust);color:#fff}
+.tab.on .d{background:rgba(255,255,255,.25);color:#fff}
+.tab:hover:not(.on){background:#fff8f0}
+
+/* slide */
+.stage{background:var(--cream);border-radius:16px;padding:16px 18px;min-height:540px;display:flex;flex-direction:column}
+.slide{flex:1;display:flex;flex-direction:column;animation:in .28s ease}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.slide{animation:none}}
+.kicker{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.chip{background:var(--sand);border-radius:999px;padding:3px 10px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.chip.r{background:var(--rust);color:#fff} .chip.o{background:var(--olive);color:#fff}
+h2{font-size:21px;font-weight:700;line-height:1.2;margin-bottom:6px}
+.lead{font-size:14px;color:var(--ink);margin-bottom:12px;max-width:640px}
+.ttl{font-weight:700;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--olive);margin-bottom:5px}
+
+/* row slide: phone clip + checks */
+.rowgrid{display:grid;grid-template-columns:236px 1fr;gap:20px;align-items:start;flex:1}
+.phone{position:relative;width:236px;border-radius:30px;background:#1F2020;padding:8px;box-shadow:0 6px 18px rgba(51,35,26,.18)}
+.phone video{display:block;width:220px;height:489px;border-radius:23px;background:#f4f4f2;object-fit:cover}
+.phone .speed{position:absolute;top:18px;right:18px;background:var(--rust);color:#fff;font-weight:700;font-size:11px;border-radius:999px;padding:3px 9px}
+.phone .replay{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);background:rgba(31,32,32,.82);color:#fff;font-size:11.5px;font-weight:600;border-radius:999px;padding:6px 12px}
+.checks{display:flex;flex-direction:column;gap:9px}
+.box{background:#fff8f0;border-radius:12px;padding:10px 13px}
+.box p{font-size:13.5px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.log{background:var(--dark);color:var(--cream);border-radius:12px;padding:10px 13px}
+.log .ttl{color:rgba(247,239,230,.7)}
+.log div.l{display:grid;grid-template-columns:96px 1fr;gap:10px;font-size:12px;padding:2px 0;font-variant-numeric:tabular-nums}
+.log .t{color:var(--rose);font-weight:600}
+.log .k-open{color:#F2B59C} .log .k-clear{color:#C9E4B4} .log .k-admin{color:#F7E1A6}
+.verdict{display:flex;align-items:center;gap:10px}
+.pass{background:var(--olive);color:#fff;font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;border-radius:8px;padding:5px 10px}
+.verdict span:not(.pass){font-size:12px;color:var(--olive)}
+
+/* overview and text slides */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.card{background:#fff8f0;border-radius:14px;padding:12px 14px}
+.card.dark{background:var(--dark);color:var(--cream)} .card.dark .ttl{color:rgba(247,239,230,.7)}
+.card.rust{background:var(--rust);color:#fff} .card.rust .ttl{color:rgba(255,255,255,.8)}
+.card.rose{background:var(--rose)}
+.card b{display:block;font-size:14px;margin-bottom:3px}
+.card p{font-size:12.8px}
+a.card{color:inherit;text-decoration:none;display:block;cursor:pointer;transition:transform .15s}
+.go{cursor:pointer} .go:hover{transform:translateY(-2px)}
+.num{width:28px;height:28px;border-radius:50%;background:var(--rust);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+ul{list-style:none} li{position:relative;padding-left:15px;margin:4px 0;font-size:13px}
+li:before{content:"";position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:50%;background:var(--rust)}
+.card.dark li:before,.card.rust li:before{background:var(--rose)}
+.big{font-weight:700;font-size:34px;line-height:1;color:var(--rust)}
+.card.dark .big{color:var(--rose)} .card.rust .big{color:#fff}
+.sub{font-size:12px;color:var(--olive);margin-top:4px} .card.dark .sub{color:rgba(247,239,230,.75)} .card.rust .sub{color:rgba(255,255,255,.85)}
+.cite{font-size:10.5px;color:var(--olive);margin-top:8px;line-height:1.3}
+.card.dark .cite{color:rgba(247,239,230,.65)}
+.note{font-size:12px;color:var(--olive);font-style:italic;margin-top:8px}
+
+/* runs */
+.runs{display:flex;flex-direction:column;gap:8px}
+.run{display:grid;grid-template-columns:70px 1fr 120px;gap:12px;align-items:center;background:#fff8f0;border-radius:12px;padding:10px 13px}
+.run .cells{display:flex;gap:3px}
+.run .cells i{flex:1;height:18px;border-radius:4px;background:var(--olive)}
+.run .cells i.f{background:var(--rust)} .run .cells i.s{background:var(--sand)}
+.run b{font-size:13px} .run .res{font-weight:700;font-size:13px;text-align:right}
+.run .res.bad{color:var(--rust)}
+
+/* flow diagram */
+.flow{display:grid;grid-template-columns:1fr 1.25fr 1fr 1.25fr 1fr;align-items:center;gap:0;margin:4px 0 12px}
+.node{background:var(--dark);color:var(--cream);border-radius:14px;padding:12px;text-align:center}
+.node b{display:block;font-size:14px} .node span{font-size:11px;color:rgba(247,239,230,.75)}
+.pipe{position:relative;height:66px;display:flex;flex-direction:column;justify-content:center;padding:0 8px}
+.pipe .ln{height:2px;background:var(--olive);position:relative;margin:7px 0}
+.pipe .ln:after{content:"";position:absolute;top:-4px;border:5px solid transparent}
+.pipe .ln.r:after{right:-2px;border-left:7px solid var(--olive)} .pipe .ln.l:after{left:-2px;border-right:7px solid var(--olive)}
+.pipe small{font-size:10.5px;text-align:center;color:var(--olive);font-weight:600;line-height:1.15}
+.pulse{position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--rust);animation:run 2.4s linear infinite}
+.ln.l .pulse{animation-name:runl;animation-delay:1.2s}
+@keyframes run{from{left:0}to{left:calc(100% - 8px)}} @keyframes runl{from{left:calc(100% - 8px)}to{left:0}}
+@media (prefers-reduced-motion:reduce){.pulse{display:none}}
+
+/* bars */
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar{display:grid;grid-template-columns:150px 1fr 92px;gap:10px;align-items:center;font-size:12.8px}
+.bar .tr{height:20px;background:var(--sand);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;background:var(--rust);border-radius:6px}
+.bar .fill.o{background:var(--olive)} .bar .fill.d{background:var(--dark)}
+.bar .v{font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+
+/* bottom nav */
+.nav{display:flex;align-items:center;gap:10px;margin-top:12px}
+.nav .btn{background:var(--rust);color:#fff;font-weight:700;font-size:13px;border-radius:999px;padding:8px 16px}
+.nav .btn.ghost{background:var(--cream);color:var(--ink)}
+.nav .btn:disabled{opacity:.4;cursor:default}
+.dots{flex:1;display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+.dots button{width:9px;height:9px;border-radius:50%;background:var(--cream)}
+.dots button.on{background:var(--rust);width:22px;border-radius:5px}
+.count{font-size:12px;color:var(--olive);font-weight:600;min-width:52px;text-align:center}
+
+@media (max-width:700px){
+  .rowgrid{grid-template-columns:1fr} .phone{margin:0 auto}
+  .two,.g2{grid-template-columns:1fr} .g4{grid-template-columns:1fr 1fr}
+  .flow{grid-template-columns:1fr} .pipe{height:auto;padding:6px 30%}
+  .bar{grid-template-columns:1fr 70px} .bar .lb{grid-column:1/-1}
+  .run{grid-template-columns:60px 1fr} .run .res{grid-column:1/-1;text-align:left}
+  .dots{display:none}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="top" id="tabs"><span class="brand">Ranger Danger · How we tested it</span></div>
+  <div class="stage" id="stage" aria-live="polite"></div>
+  <div class="nav">
+    <button class="btn ghost" id="prev">← Back</button>
+    <div class="dots" id="dots"></div>
+    <span class="count" id="count"></span>
+    <button class="btn" id="next">Next →</button>
+  </div>
+</div>
+<script>
+const PLAN = {"sections":[{"n":"01","title":"Shift and check-in","lead":"Start a shift, then check in. The base starts a 2-minute countdown and moves it with every check-in.","rows":"Rows 1 and 2"},{"n":"02","title":"SOS","lead":"The SOS slider sends only when the handle passes nine tenths of the track. The base answers, and the ranger cancels.","rows":"Rows 3 to 6"},{"n":"03","title":"Fall","lead":"A recorded fall plays into the fall detector. I’m OK and Need help now each need a 2-second hold.","rows":"Rows 7 to 11"},{"n":"04","title":"Missed check-in","lead":"Nobody checks in for 2 minutes. At the deadline the phone and the base both raise the alarm.","rows":"Row 12"},{"n":"05","title":"Map and end of shift","lead":"The Lama Lama map opens and closes, and the shift ends.","rows":"Rows 13 and 14"}],"rows":[{"n":1,"s":0,"t":"Start shift","sec":5.144,"a":"Tap Start shift.","p":"The countdown starts at 2:00, the interval the base set for this test.","b":"The shift is on, with its deadline 2 minutes after the start.","log":[["15:25:04.122","shift_start received","event"],["15:25:04.330","position received · battery 100% · no GPS fix","event"]],"fast":1},{"n":2,"s":0,"t":"Check in","sec":3.882,"a":"Tap Check in.","p":"“Saved on phone, waiting for signal”, then “Received by base”.","b":"The deadline moves to 2 minutes after the check-in.","log":[["15:25:09.256","check_in received","event"]],"fast":1},{"n":3,"s":1,"t":"SOS slider, half way","sec":12.651,"a":"Slide the SOS handle half way and let go.","p":"Nothing happens. The handle springs back: a slide counts only past nine tenths of the track.","b":"No SOS arrives and no alert opens.","log":[["15:25:11–24","nothing received for 12 s","note"]],"fast":4},{"n":4,"s":1,"t":"SOS slider, to the end","sec":6.6,"a":"Slide the SOS handle to the end.","p":"The SOS screen, then “SOS received by base”.","b":"An SOS alert opens, red.","log":[["15:25:29.466","sos received (slider)","event"],["15:25:29.466","alert 38 · SOS · opened · red","open"]],"fast":1},{"n":5,"s":1,"t":"Search party sent","sec":3.25,"a":"The base presses Search party sent.","p":"“Base has seen your alert. Help is coming.”","b":"The alert moves to Search party sent.","log":[["15:25:31.907","alert 38 → search party sent · admin","admin"]],"fast":1},{"n":6,"s":1,"t":"Slide to cancel SOS","sec":6.623,"a":"Slide “Slide to cancel SOS” to the end.","p":"Back home, with “SOS cancelled”.","b":"With a search party out, the alert stays with the base and records the cancel. The admin closes it.","log":[["15:25:40.207","sos_cancelled received","event"],["15:25:40.207","alert 38 · response “SOS cancelled by ranger”","clear"],["15:25:40.675","alert 38 → closed · Ranger found · admin","admin"]],"fast":1},{"n":7,"s":2,"t":"Simulate fall","sec":9.214,"a":"Check in, open Settings, tap Simulate fall.","p":"The fall screen counts down from 0:30 and the alarm sounds.","b":"A fall alert opens, amber, with a 30-second countdown.","log":[["15:25:44.617","check_in received","event"],["15:25:48.628","fall_detected received · peak 3.50 g","event"],["15:25:48.628","alert 39 · fall · opened · amber","open"]],"fast":1},{"n":8,"s":2,"t":"I’m OK, pressed briefly","sec":6.482,"a":"Press I’m OK for half a second.","p":"Nothing happens. The fall screen and the alarm stay: I’m OK needs a 2-second hold.","b":"The fall alert stays open and amber.","log":[["15:25:52–59","nothing received · alert 39 still open, amber","note"]],"fast":1},{"n":9,"s":2,"t":"I’m OK, held","sec":6.984,"a":"Hold I’m OK for 2.2 seconds.","p":"The fill crosses the button, the fall screen closes and the alarm stops.","b":"The fall alert is Cleared: cancelled on phone.","log":[["15:26:03.658","fall_cancelled received","event"],["15:26:03.658","alert 39 → cleared · cancelled on phone","clear"]],"fast":1},{"n":10,"s":2,"t":"Need help now","sec":13.511,"a":"Simulate a second fall, then hold Need help now for 2.2 seconds.","p":"The fall screen, then the SOS screen and “SOS received by base”.","b":"A new fall alert opens amber, then an SOS alert opens red.","log":[["15:26:13.959","alert 40 · fall · opened · amber","open"],["15:26:17.704","sos received (fall screen)","event"],["15:26:17.704","alert 41 · SOS · opened · red","open"]],"fast":3},{"n":11,"s":2,"t":"Cancel the SOS after a fall","sec":6.613,"a":"Slide “Slide to cancel SOS” to the end.","p":"Back home, with “SOS cancelled”.","b":"The SOS and its fall are both Cleared.","log":[["15:26:25.331","sos_cancelled and fall_cancelled received","event"],["15:26:25.331","alert 41 → cleared · SOS cancelled by ranger","clear"],["15:26:25.331","alert 40 → cleared · cancelled on phone","clear"]],"fast":1},{"n":12,"s":3,"t":"Missed check-in","sec":85.41,"a":"No check-in. The last was in row 7, so the countdown runs out 75 s into this row. Then tap Check in.","p":"At 0:00 the overdue screen and its alarm. Check in returns the phone home.","b":"A missed check-in alert opens red, then Clears when the check-in arrives.","log":[["15:27:46.876","alert 42 · missed check-in · opened · red","open"],["15:27:50.525","check_in received","event"],["15:27:50.525","alert 42 → cleared · check-in received","clear"]],"fast":12},{"n":13,"s":4,"t":"Map, then Back","sec":8.977,"a":"Tap Map, then Back.","p":"The Lama Lama map draws its layers. Indoors the phone had no GPS fix, so the map stays on the Ranger Base.","b":"Every event of the shift has arrived. The shift’s trail holds no GPS fix.","log":[["15:27:04.243","position received · no GPS fix","event"],["15:27:55","trail of the shift · 0 GPS fixes","note"]],"fast":1},{"n":14,"s":4,"t":"End shift","sec":4.036,"a":"Tap End shift.","p":"“Start shift” and “Off shift”.","b":"The ranger is off shift.","log":[["15:28:04.995","shift_end received","event"]],"fast":1}]};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const TESTS = ['Overview','Buttons','Connection','GPS','Fall detection'];
+
+// ---------- slides ----------
+const slides = [];
+const add = (test, html, video) => slides.push({test, html, video});
+
+// Overview
+add(0, `
+  <div class="kicker"><span class="chip r">Prototype testing</span><span class="chip">4 tests</span></div>
+  <h2>We tested four things: the buttons, the connection, the GPS and the fall detection</h2>
+  <p class="lead">Each test answers one question about whether a custom app can keep a ranger safe. Click a test, or press Next to step through every check.</p>
+  <div class="g4">
+    <div class="card go" data-jump="1"><div class="num">1</div><b>Buttons</b><p>An automated test pressed every control on the real phone and checked the base reacted.</p><div class="note">14 / 14 passed</div></div>
+    <div class="card go" data-jump="2"><div class="num">2</div><b>Connection</b><p>Every check-in, SOS and fall alert had to reach the base, and the base's replies had to reach the phone.</p><div class="note">All received, no visible delay</div></div>
+    <div class="card go" data-jump="3"><div class="num">3</div><b>GPS</b><p>The phone's position was compared with an iPhone, then the GPS signal was spoofed.</p><div class="note">Positions matched</div></div>
+    <div class="card go" data-jump="4"><div class="num">4</div><b>Fall detection</b><p>30 dives onto grass, then 2 hours of normal walking with the phone in a pocket.</p><div class="note">26 / 30 falls detected</div></div>
+  </div>
+  <div class="card dark" style="margin-top:10px"><div class="ttl">How to read the button slides</div>
+    <ul><li>The video on the left is the real phone's screen during the automated test.</li><li>The dark box is the base's own log of what arrived, with the server's clock.</li><li>Long waits are sped up, and the speed is marked on the video.</li></ul></div>
+`);
+
+// Buttons: how the test works
+add(1, `
+  <div class="kicker"><span class="chip r">Test 1 · Buttons</span><span class="chip">How the test works</span></div>
+  <h2>A script pressed every button on the real phone, and checked the base after each press</h2>
+  <p class="lead">The test is an Android instrumented test: code that runs on the phone over a USB cable in debug mode and presses the screen the way a finger would. After each press it asks the base what arrived.</p>
+  <div class="g2">
+    <div class="card"><div class="ttl">The setup</div><ul>
+      <li>A Motorola moto g05 running our app, plugged into a laptop by USB</li>
+      <li>The server running on the laptop, reached over the same cable</li>
+      <li>Check-in interval shortened to 2 minutes, fall countdown to 30 seconds</li>
+      <li>The whole run recorded from the phone's screen</li></ul></div>
+    <div class="card"><div class="ttl">The 14 rows, in 5 groups</div><ul>
+      ${PLAN.sections.map(s=>`<li><b style="display:inline;font-size:13px">${esc(s.title)}</b> · ${esc(s.rows)}</li>`).join('')}</ul></div>
+  </div>
+  <div class="card rust" style="margin-top:10px"><div class="ttl">What counts as a pass</div><p>A row passes only when the phone shows the right screen <b style="display:inline">and</b> the base records the right event. One missing message fails the row.</p></div>
+`);
+
+// Buttons: each row
+PLAN.rows.forEach(r => {
+  const sec = PLAN.sections[r.s];
+  const log = r.log.map(([t,txt,k]) => `<div class="l"><span class="t">${esc(t)}</span><span class="k-${k}">${esc(txt)}</span></div>`).join('');
+  add(1, `
+    <div class="rowgrid">
+      <div class="phone">
+        <video src="clips/row-${pad(r.n)}.mp4" poster="clips/row-${pad(r.n)}.jpg" muted playsinline preload="metadata" aria-label="Phone screen recording, row ${r.n}"></video>
+        ${r.fast>1?`<span class="speed">Waits sped up ${r.fast}×</span>`:''}
+        <button class="replay" hidden>↻ Replay</button>
+      </div>
+      <div class="checks">
+        <div class="kicker"><span class="chip r">Test 1 · Buttons</span><span class="chip">${sec.n} · ${esc(sec.title)}</span><span class="chip">Row ${r.n} of 14</span></div>
+        <h2>${esc(r.t)}</h2>
+        <div class="box"><div class="ttl">What the test did</div><p>${esc(r.a)}</p></div>
+        <div class="two">
+          <div class="box"><div class="ttl">The phone should show</div><p>${esc(r.p)}</p></div>
+          <div class="box"><div class="ttl">The base should record</div><p>${esc(r.b)}</p></div>
+        </div>
+        <div class="log"><div class="ttl">The base's log for this row</div>${log}</div>
+        <div class="verdict"><span class="pass">Passed</span><span>Row took ${r.sec.toFixed(1)} s in the test report</span></div>
+      </div>
+    </div>`, true);
+});
+
+// Buttons: the three runs
+const cells = (fail) => Array.from({length:14},(_,i)=> `<i class="${fail&&i===12?'f':''}${fail&&i===13?'s':''}"></i>`).join('');
+add(1, `
+  <div class="kicker"><span class="chip r">Test 1 · Buttons</span><span class="chip">Result</span></div>
+  <h2>The first run failed at the map. The test was wrong, not the app.</h2>
+  <p class="lead">Indoors, the phone had no GPS fix. The test expected a position on the map, so row 13 failed and row 14 was skipped. The app had done the right thing: with no fix, it shows the Ranger Base. We changed the test to accept both cases, then ran it twice more.</p>
+  <div class="runs">
+    <div class="run"><b>Run 1</b><div class="cells">${cells(true)}</div><div class="res bad">13 / 14 · failed</div></div>
+    <div class="run"><b>Run 2</b><div class="cells">${cells(false)}</div><div class="res">14 / 14 · passed</div></div>
+    <div class="run"><b>Run 3</b><div class="cells">${cells(false)}</div><div class="res">14 / 14 · passed</div></div>
+  </div>
+  <div class="g2" style="margin-top:12px">
+    <div class="card"><div class="ttl">What this showed</div><p>Every control on the phone does what it should, and the base sees each one. A full shift's worth of presses takes about 3 minutes to check.</p></div>
+    <div class="card dark"><div class="ttl">What it did not show</div><p>The test ran indoors, by a laptop, on a cable. It says nothing about weak signal, heat or a ranger's gloved hands.</p></div>
+  </div>
+  <div class="note">The videos come from run 3, recorded on 22 October 2026.</div>
+`);
+
+// Connection
+add(2, `
+  <div class="kicker"><span class="chip r">Test 2 · Connection</span><span class="chip">User test</span></div>
+  <h2>Every message the phone sent reached the base, and every reply from the base reached the phone</h2>
+  <p class="lead">The phone and the dashboard never talk directly. Each message goes up to the server first, and the dashboard shows what the server holds.</p>
+  <div class="flow">
+    <div class="node"><b>Ranger's phone</b><span>Android app</span></div>
+    <div class="pipe"><small>check-ins, SOS, falls, position</small><div class="ln r"><i class="pulse"></i></div><div class="ln l"><i class="pulse"></i></div><small>"received by base", "help is coming"</small></div>
+    <div class="node"><b>Server</b><span>cloud, on Railway</span></div>
+    <div class="pipe"><small>live updates</small><div class="ln r"><i class="pulse"></i></div><div class="ln l"><i class="pulse"></i></div><small>search party sent, ranger found</small></div>
+    <div class="node"><b>Dashboard</b><span>ranger base</span></div>
+  </div>
+  <div class="g2">
+    <div class="card"><div class="ttl">Phone → base: checked</div><ul>
+      <li>Shift start and shift end</li><li>Check-in, and the overdue alarm when one is missed</li><li>SOS and SOS cancel</li><li>Fall alert, "I'm OK" and "Need help now"</li><li>Position, with battery level</li></ul></div>
+    <div class="card"><div class="ttl">Base → phone: checked</div><ul>
+      <li>"Received by base" after every check-in and SOS</li><li>"Base has seen your alert. Help is coming." after Search party sent</li><li>The check-in interval and fall countdown set on the dashboard</li></ul></div>
+  </div>
+  <div class="card rust" style="margin-top:10px"><div class="ttl">Result</div><p>All messages were sent and received in both directions. The dashboard changed as soon as the phone's screen did, with no delay we could see.</p></div>
+`);
+
+// GPS
+add(3, `
+  <div class="kicker"><span class="chip r">Test 3 · GPS</span><span class="chip">User test</span></div>
+  <h2>The phone put itself in the right place, and it used real GPS rather than guessing from the internet</h2>
+  <p class="lead">A phone can estimate its position two ways: from GPS satellites, or roughly from its internet connection. Out on Country there is no useful internet location, so the app has to use GPS.</p>
+  <div class="g2">
+    <div class="card"><div class="num">1</div><b>Same place, two phones</b><p>We stood in one spot and compared the position the app sent to the dashboard with the position on an iPhone.</p><div class="note">Result: the two positions matched.</div></div>
+    <div class="card"><div class="num">2</div><b>A fake GPS signal</b><p>A debug app fed a made-up location into the Android phone's GPS. If the app had been using the internet connection, it would have ignored the fake. Instead, the dashboard moved the ranger to the fake location.</p><div class="note">Result: the app follows the phone's GPS.</div></div>
+  </div>
+  <div class="card dark" style="margin-top:10px"><div class="ttl">Limits of this test</div><ul><li>The comparison was by eye, not measured in metres.</li><li>The test was in Sydney, under open sky, not under tree cover on Lama Lama Country.</li></ul></div>
+`);
+
+// Fall: version 1
+add(4, `
+  <div class="kicker"><span class="chip r">Test 4 · Fall detection</span><span class="chip">Version 1</span></div>
+  <h2>The first fall detector caught fewer than half of our falls</h2>
+  <p class="lead">Version 1 raised a fall only when four signs all appeared together. In a few informal dives, it went off less than half the time.</p>
+  <div class="g4">
+    <div class="card"><div class="num">1</div><b>Free fall</b><p>The phone feels almost weightless for a moment.</p></div>
+    <div class="card"><div class="num">2</div><b>Impact</b><p>A hard spike of force as the body lands.</p></div>
+    <div class="card"><div class="num">3</div><b>Stillness</b><p>The phone stays still after the landing.</p></div>
+    <div class="card"><div class="num">4</div><b>Lying down</b><p>The phone ends up at a lying-down angle.</p></div>
+  </div>
+  <div class="g2" style="margin-top:10px">
+    <div class="card dark"><div class="ttl">Why it missed</div><p>Requiring every sign multiplies the misses. Research on real falls says the same: a chain of checks like this caught only 30% of 143 real falls, where a model that weighs the signs together caught 83%.</p><div class="cite">Palmerini et al., 2020</div></div>
+    <div class="card rust"><div class="ttl">What we changed for version 2</div><p>Version 2 decides on two things: a hard impact, and a large change in the phone's angle at that impact. Free fall and stillness are still measured, but only logged.</p></div>
+  </div>
+`);
+
+// Fall: the big test
+add(4, `
+  <div class="kicker"><span class="chip r">Test 4 · Fall detection</span><span class="chip">Version 2 · the big test</span></div>
+  <h2>Version 2 caught 26 of 30 dives, and gave no false alarms in 2 hours of normal use</h2>
+  <p class="lead">We dove onto the grass in a backyard 30 times: 20 with the phone in a pocket, 10 with it held in a hand.</p>
+  <div class="g2" style="align-items:start">
+    <div class="card"><div class="ttl">Falls detected</div><div class="bars">
+      <div class="bar"><span class="lb">Phone in pocket</span><div class="tr"><div class="fill" style="width:95%"></div></div><span class="v">19 / 20</span></div>
+      <div class="bar"><span class="lb">Phone in hand</span><div class="tr"><div class="fill o" style="width:70%"></div></div><span class="v">7 / 10</span></div>
+      <div class="bar"><span class="lb"><b style="display:inline">All dives</b></span><div class="tr"><div class="fill d" style="width:86.7%"></div></div><span class="v">26 / 30</span></div>
+    </div>
+    <div class="note">All 4 misses were hand-held dives where the phone was dropped during the fall.</div></div>
+    <div class="card dark"><div class="ttl">False alarms</div><div class="big">0</div><div class="sub">in about 2 hours of walking around with the phone in a pocket during a normal day</div></div>
+  </div>
+  <div class="card rose" style="margin-top:10px"><div class="ttl">How sure we can be</div><p>30 dives is a small sample. The true detection rate is probably somewhere between 69% and 96% (95% confidence interval). The dives were by one person onto soft grass, so they also say nothing yet about older rangers or rocky ground.</p></div>
+`);
+
+// Fall: cross-check
+add(4, `
+  <div class="kicker"><span class="chip r">Test 4 · Fall detection</span><span class="chip">Cross-check</span></div>
+  <h2>A replay of 208 lab falls gave almost the same rate as our backyard test</h2>
+  <p class="lead">We ran a public set of recorded falls through the same detector code. Each recording came from a phone in a volunteer's pocket while they fell onto a mattress, or did an everyday activity.</p>
+  <div class="g2" style="align-items:start">
+    <div class="card"><div class="ttl">Detection rate</div><div class="bars">
+      <div class="bar"><span class="lb">Our 30 dives</span><div class="tr"><div class="fill" style="width:86.7%"></div></div><span class="v">86.7%</span></div>
+      <div class="bar"><span class="lb">208 lab falls</span><div class="tr"><div class="fill o" style="width:86.5%"></div></div><span class="v">86.5%</span></div>
+    </div><div class="note">The lab falls used the detector's normal sensitivity setting.</div></div>
+    <div class="card"><div class="ttl">False alarms in the lab set</div><div class="big">5.2%</div><div class="sub">28 of 538 everyday activities set off the detector. 25 of the 28 were lifting the phone up to the ear to make a call</div></div>
+  </div>
+  <div class="card dark" style="margin-top:10px"><div class="ttl">What this means</div><p>Two different tests give the same rate, so our result is unlikely to be a fluke. The detector still misses about 1 fall in 7, which is why the check-in timer and the SOS slider stay in the design as backups.</p>
+  <div class="cite">Lab falls: UMAFall dataset, Casilari et al., 2017 (CC BY 4.0).</div></div>
+`);
+
+// ---------- render ----------
+const stage = document.getElementById('stage'), dots = document.getElementById('dots');
+const tabs = document.getElementById('tabs'), count = document.getElementById('count');
+const prev = document.getElementById('prev'), next = document.getElementById('next');
+let at = 0;
+TESTS.forEach((t,i) => {
+  const b = document.createElement('button'); b.className='tab'; b.dataset.t=i;
+  b.innerHTML = i ? `<span class="d">${i}</span>${t}` : t;
+  b.onclick = () => go(slides.findIndex(s => s.test===i)); tabs.appendChild(b);
+});
+slides.forEach((s,i) => { const d=document.createElement('button'); d.setAttribute('aria-label','Slide '+(i+1)); d.onclick=()=>go(i); dots.appendChild(d); });
+
+function go(i){
+  at = Math.max(0, Math.min(slides.length-1, i));
+  const s = slides[at];
+  stage.innerHTML = `<div class="slide">${s.html}</div>`;
+  [...tabs.querySelectorAll('.tab')].forEach(b => b.classList.toggle('on', +b.dataset.t===s.test));
+  [...dots.children].forEach((d,k) => d.classList.toggle('on', k===at));
+  count.textContent = `${at+1} / ${slides.length}`;
+  prev.disabled = at===0; next.disabled = at===slides.length-1;
+  stage.querySelectorAll('[data-jump]').forEach(c => c.onclick = () => go(slides.findIndex(x => x.test===+c.dataset.jump)));
+  const v = stage.querySelector('video');
+  if (v) {
+    const rb = stage.querySelector('.replay');
+    v.onended = () => { rb.hidden = false; };
+    rb.onclick = () => { rb.hidden = true; v.currentTime = 0; v.play(); };
+    v.play().catch(()=>{ rb.hidden=false; rb.textContent='▶ Play'; });
+  }
+  // warm the next clip
+  const n = slides[at+1]; if (n && n.video) { const m = n.html.match(/src="([^"]+)"/); if (m) { const l=document.createElement('link'); l.rel='prefetch'; l.href=m[1]; document.head.appendChild(l); } }
+}
+prev.onclick = () => go(at-1); next.onclick = () => go(at+1);
+document.addEventListener('keydown', e => { if (e.key==='ArrowRight') go(at+1); if (e.key==='ArrowLeft') go(at-1); });
+go(0);
+</script>
+</body>
+</html>
